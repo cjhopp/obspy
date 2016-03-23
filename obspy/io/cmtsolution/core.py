@@ -80,7 +80,7 @@ def _is_cmtsolution(filename_or_buf):
                              reset_fp=True)
     # Happens for example when passing the data as a string which would be
     # interpreted as a filename.
-    except (OSError, FileNotFoundError):
+    except OSError:
         return False
 
 
@@ -344,7 +344,7 @@ def _internal_write_single_cmtsolution(buf, event, **kwargs):
     """
     if not event.focal_mechanisms:
         raise ValueError("Event must contain a focal mechanism.")
-    foc_mec = event.preferred_focal_mechanism() or event.focal_mechansisms[0]
+    foc_mec = event.preferred_focal_mechanism() or event.focal_mechanisms[0]
     if not foc_mec.moment_tensor:
         raise ValueError("The preferred or first focal mechanism must "
                          "contain a moment tensor.")

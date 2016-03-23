@@ -557,7 +557,7 @@ def _set_lcalda(self, value):
     # make and use a bool setter for lcalda
     lcalda_setter = _boolsetter('lcalda')
     lcalda_setter(self, value)
-    # try to set set distances if value evaluates to True
+    # try to set set distances if "value" evaluates to True
     if value:
         try:
             self._set_distances()
@@ -804,6 +804,8 @@ class SACTrace(object):
         self._hs = hs
         self.data = data
 
+        self._set_distances()
+
     # ---------------------------- SET UP HEADERS -----------------------------
     # SAC header values are set up as attributes, with getters and setters
     # format: header = property(getter_function, setter_function)
@@ -857,7 +859,7 @@ class SACTrace(object):
                     doc=HD.DOC['evla'])
     evlo = property(_floatgetter('evlo'), _geosetter('evlo'),
                     doc=HD.DOC['evlo'])
-    evdp = property(_floatgetter('evdp'), _floatsetter('evsp'),
+    evdp = property(_floatgetter('evdp'), _floatsetter('evdp'),
                     doc=HD.DOC['evdp'])
     mag = property(_floatgetter('mag'), _floatsetter('mag'), doc=HD.DOC['mag'])
     user0 = property(_floatgetter('user0'), _floatsetter('user0'),
@@ -1539,6 +1541,7 @@ class SACTrace(object):
     def _set_distances(self, force=False):
         """
         Calculate dist, az, baz, gcarc.  If force=True, ignore lcalda.
+        Raises SacHeaderError if force=True and geographic headers are unset.
 
         """
         if self.lcalda or force:
@@ -1547,14 +1550,13 @@ class SACTrace(object):
                                               self.stlo)
                 dist = m / 1000.0
                 gcarc = kilometer2degrees(dist)
-                self.az = az
-                self.baz = baz
-                self.dist = dist
-                self.gcarc = gcarc
-            except TypeError:
-                # one of the geographic values is None
-                msg = "Not enough information to calculate distance, azimuth."
-                raise SacHeaderError(msg)
-        else:
-            msg = "lcalda is False or unset. To set distances, set it to True."
-            raise SacError(msg)
+                self._hf[HD.FLOATHDRS.index('az')] = az
+                self._hf[HD.FLOATHDRS.index('baz')] = baz
+                self._hf[HD.FLOATHDRS.index('dist')] = dist
+                self._hf[HD.FLOATHDRS.index('gcarc')] = gcarc
+            except (ValueError, TypeError):
+                # one or more of the geographic values is None
+                if force:
+                    msg = ("Not enough information to calculate distance, "
+                           "azimuth.")
+                    raise SacHeaderError(msg)

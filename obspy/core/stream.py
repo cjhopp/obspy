@@ -30,7 +30,7 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core.util import NamedTemporaryFile
 from obspy.core.util.base import (ENTRY_POINTS, _get_function_from_entry_point,
                                   _read_from_plugin, download_to_file)
-from obspy.core.util.decorator import (deprecated, map_example_filename,
+from obspy.core.util.decorator import (map_example_filename,
                                        raise_if_masked, uncompress_file)
 from obspy.core.util.misc import get_window_times
 
@@ -737,16 +737,6 @@ class Stream(object):
             raise TypeError(msg)
         return self
 
-    @deprecated(
-        "'getGaps' has been renamed to "  # noqa
-        "'get_gaps'. Use that instead.")
-    def getGaps(self, *args, **kwargs):
-        '''
-        DEPRECATED: 'getGaps' has been renamed to
-        'get_gaps'. Use that instead.
-        '''
-        return self.get_gaps(*args, **kwargs)
-
     def get_gaps(self, min_gap=None, max_gap=None):
         """
         Determine all trace gaps/overlaps of the Stream object.
@@ -1201,16 +1191,6 @@ class Stream(object):
         """
         return self.traces.pop(index)
 
-    @deprecated(
-        "'printGaps' has been renamed to "  # noqa
-        "'print_gaps'. Use that instead.")
-    def printGaps(self, *args, **kwargs):
-        '''
-        DEPRECATED: 'printGaps' has been renamed to
-        'print_gaps'. Use that instead.
-        '''
-        return self.print_gaps(*args, **kwargs)
-
     def print_gaps(self, min_gap=None, max_gap=None):
         """
         Print gap/overlap list summary information of the Stream object.
@@ -1386,16 +1366,17 @@ class Stream(object):
             self.traces.sort(key=lambda x: x.stats[_i], reverse=reverse)
         return self
 
-    def write(self, filename, format, **kwargs):
+    def write(self, filename, format=None, **kwargs):
         """
         Save stream into a file.
 
         :type filename: str
         :param filename: The name of the file to write.
-        :type format: str
+        :type format: str, optional
         :param format: The file format to use (e.g. ``"MSEED"``). See
             the `Supported Formats`_ section below for a list of supported
-            formats.
+            formats. If format is set to ``None`` it will be deduced from
+            file extension, whenever possible.
         :param kwargs: Additional keyword arguments passed to the underlying
             waveform writer method.
 
@@ -1404,6 +1385,11 @@ class Stream(object):
         >>> from obspy import read
         >>> st = read()  # doctest: +SKIP
         >>> st.write("example.mseed", format="MSEED")  # doctest: +SKIP
+
+        The ``format`` argument can be omitted, and the file format will be
+        deduced from file extension, whenever possible.
+
+        >>> st.write("example.mseed")  # doctest: +SKIP
 
         Writing single traces into files with meaningful filenames can be done
         e.g. using trace.id
@@ -1429,6 +1415,10 @@ class Stream(object):
                       'np.array.filled() to convert the masked array to a ' + \
                       'normal array.'
                 raise NotImplementedError(msg)
+        if format is None:
+            # try to guess format from file extension
+            _, format = os.path.splitext(filename)
+            format = format[1:]
         format = format.upper()
         try:
             # get format specific entry point
@@ -2397,33 +2387,11 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
     @raise_if_masked
     def detrend(self, type='simple'):
         """
-        Remove a linear trend from all traces.
+        Remove a trend from all traces.
 
-        :type type: str, optional
-        :param type: Method to use for detrending. Defaults to ``'simple'``.
-            See the `Supported Methods`_ section below for further details.
-
-        .. note::
-
-            This operation is performed in place on the actual data arrays. The
-            raw data is not accessible anymore afterwards. To keep your
-            original data, use :meth:`~obspy.core.stream.Stream.copy` to create
-            a copy of your stream object.
-            This also makes an entry with information on the applied processing
-            in ``stats.processing`` of every trace.
-
-        .. rubric:: _`Supported Methods`
-
-        ``'simple'``
-            Subtracts a linear function defined by first/last sample of the
-            trace (uses :func:`obspy.signal.detrend.simple`).
-
-        ``'linear'``
-            Fitting a linear function to the trace with least squares and
-            subtracting it (uses :func:`scipy.signal.detrend`).
-
-        ``'constant'`` or ``'demean'``
-            Mean of data is subtracted (uses :func:`scipy.signal.detrend`).
+        For details see the corresponding
+        :meth:`~obspy.core.trace.Trace.detrend` method of
+        :class:`~obspy.core.trace.Trace`.
         """
         for tr in self:
             tr.detrend(type=type)
@@ -3076,21 +3044,6 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         for tr in self:
             tr.remove_sensitivity(*args, **kwargs)
         return self
-
-
-@deprecated("Renamed to '_is_pickle'. Use that instead.")
-def isPickle(*args, **kwargs):  # noqa
-    return _is_pickle(*args, **kwargs)
-
-
-@deprecated("Renamed to '_read_pickle'. Use that instead.")
-def readPickle(*args, **kwargs):  # noqa
-    return _read_pickle(*args, **kwargs)
-
-
-@deprecated("Renamed to '_write_pickle'. Use that instead.")
-def writePickle(*args, **kwargs):  # noqa
-    return _write_pickle(*args, **kwargs)
 
 
 def _is_pickle(filename):  # @UnusedVariable
