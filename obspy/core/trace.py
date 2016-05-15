@@ -1609,12 +1609,11 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             freq = self.stats.sampling_rate * 0.5 / float(factor)
             self.filter('lowpass_cheby_2', freq=freq, maxorder=12)
 
-        orig_dtype = self.data.dtype
-        new_dtype = np.float32 if orig_dtype.itemsize == 4 else np.float64
-
-        # resample in the frequency domain
-        x = rfft(np.require(self.data, dtype=new_dtype))
-        x = np.insert(x, 1, 0)
+        # resample in the frequency domain. Make sure the byteorder is native.
+        x = rfft(self.data.newbyteorder("="))
+        # Cast the value to be inserted to the same dtype as the array to avoid
+        # issues with numpy rule 'safe'.
+        x = np.insert(x, 1, x.dtype.type(0))
         if self.stats.npts % 2 == 0:
             x = np.append(x, [0])
         x_r = x[::2]
@@ -1650,7 +1649,6 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         if num % 2 == 0:
             large_y = np.delete(large_y, -1)
         self.data = irfft(large_y) * (float(num) / float(self.stats.npts))
-        self.data = np.require(self.data, dtype=orig_dtype)
         self.stats.sampling_rate = sampling_rate
 
         return self
@@ -1896,14 +1894,24 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         type = type.lower()
         # retrieve function call from entry points
         func = _get_function_from_entry_point('detrend', type)
+
         # handle function specific settings
         if func.__module__.startswith('scipy'):
             # SciPy need to set the type keyword
             if type == 'demean':
                 type = 'constant'
             options['type'] = type
+            original_dtype = self.data.dtype
+
         # detrending
         self.data = func(self.data, **options)
+
+        # Ugly workaround for old scipy versions that might unnecessarily
+        # change the dtype of the data.
+        if func.__module__.startswith('scipy'):
+            if original_dtype == np.float32 and self.data.dtype != np.float32:
+                self.data = np.require(self.data, dtype=np.float32)
+
         return self
 
     @skip_if_no_data
@@ -2039,7 +2047,12 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         else:
             taper = np.hstack((taper_sides[:wlen], np.ones(npts - 2 * wlen),
                                taper_sides[len(taper_sides) - wlen:]))
-        self.data = self.data * taper
+
+        # Convert data if it's not a floating point type.
+        if not np.issubdtype(self.data.dtype, float):
+            self.data = np.require(self.data, dtype=np.float64)
+
+        self.data *= taper
         return self
 
     @_add_processing_info
@@ -2100,7 +2113,10 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             warnings.warn(msg)
             return self
 
-        self.data = self.data.astype(np.float64)
+        # Convert data if it's not a floating point type.
+        if not np.issubdtype(self.data.dtype, float):
+            self.data = np.require(self.data, dtype=np.float64)
+
         self.data /= abs(norm)
 
         return self
@@ -2337,18 +2353,83 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
 
         return self
 
-    def times(self):
+    def times(self, type="relative", reftime=None):
         """
-        For convenient plotting compute a NumPy array of seconds since
-        starttime corresponding to the samples in Trace.
+        For convenient plotting compute a NumPy array with timing information
+        of all samples in the Trace.
 
+        Time can be either:
+
+          * seconds relative to ``trace.stats.starttime``
+            (``type="relative"``) or to ``reftime``
+          * absolute time as
+            :class:`~obspy.core.utcdatetime.UTCDateTime` objects
+            (``type="utcdatetime"``)
+          * absolute time as POSIX timestamps (
+            :class:`UTCDateTime.timestamp <obspy.core.utcdatetime.UTCDateTime>`
+            ``type="timestamp"``)
+          * absolute time as matplotlib numeric datetime (for matplotlib
+            plotting with absolute time on axes, see :mod:`matplotlib.dates`
+            and :func:`matplotlib.dates.date2num`, ``type="matplotlib"``)
+
+        >>> from obspy import read, UTCDateTime
+        >>> tr = read()[0]
+
+        >>> tr.times()
+        array([  0.00000000e+00,   1.00000000e-02,   2.00000000e-02, ...,
+                 2.99700000e+01,   2.99800000e+01,   2.99900000e+01])
+
+        >>> tr.times(reftime=UTCDateTime("2009-01-01T00"))
+        array([ 20305203.  ,  20305203.01,  20305203.02, ...,  20305232.97,
+                20305232.98,  20305232.99])
+
+        >>> tr.times("utcdatetime")  # doctest: +SKIP
+        array([UTCDateTime(2009, 8, 24, 0, 20, 3),
+               UTCDateTime(2009, 8, 24, 0, 20, 3, 10000),
+               UTCDateTime(2009, 8, 24, 0, 20, 3, 20000), ...,
+               UTCDateTime(2009, 8, 24, 0, 20, 32, 970000),
+               UTCDateTime(2009, 8, 24, 0, 20, 32, 980000),
+               UTCDateTime(2009, 8, 24, 0, 20, 32, 990000)], dtype=object)
+
+        >>> tr.times("timestamp")
+        array([  1.25107320e+09,   1.25107320e+09,   1.25107320e+09, ...,
+                 1.25107323e+09,   1.25107323e+09,   1.25107323e+09])
+
+        >>> tr.times("matplotlib")
+        array([ 733643.01392361,  733643.01392373,  733643.01392384, ...,
+                733643.01427049,  733643.0142706 ,  733643.01427072])
+
+        :type type: str
+        :param type: Determines type of returned time array, see above for
+            valid values.
+        :type reftime: obspy.core.utcdatetime.UTCDateTime
+        :param reftime: When using a relative timing, the time used as the
+            reference for the zero point, i.e., the first sample will be at
+            ``trace.stats.starttime - reftime`` (in seconds).
         :rtype: :class:`~numpy.ndarray` or :class:`~numpy.ma.MaskedArray`
         :returns: An array of time samples in an :class:`~numpy.ndarray` if
             the trace doesn't have any gaps or a :class:`~numpy.ma.MaskedArray`
-            otherwise.
+            otherwise (``dtype`` of array is either ``float`` or
+            :class:`~obspy.core.utcdatetime.UTCDateTime`).
         """
+        type = type.lower()
         time_array = np.arange(self.stats.npts)
         time_array = time_array / self.stats.sampling_rate
+        if type == "relative":
+            if reftime is not None:
+                time_array += (self.stats.starttime - reftime)
+        elif type == "timestamp":
+            time_array = time_array + self.stats.starttime.timestamp
+        elif type == "utcdatetime":
+            time_array = np.array(
+                [self.stats.starttime + t_ for t_ in time_array])
+        elif type == "matplotlib":
+            from matplotlib.dates import date2num
+            time_array = date2num([(self.stats.starttime + t_).datetime
+                                   for t_ in time_array])
+        else:
+            msg = "Invalid `type`: {}".format(type)
+            raise ValueError(msg)
         # Check if the data is a ma.maskedarray
         if isinstance(self.data, np.ma.masked_array):
             time_array = np.ma.array(time_array, mask=self.data.mask)

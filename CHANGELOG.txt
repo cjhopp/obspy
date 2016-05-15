@@ -1,22 +1,78 @@
 master:
- - obspy.core
+ - obspy.core:
    * Stream/Trace.write() can now autodetect file format from file extension.
- - obspy.clients.fdsn
+   * New convenience property `.matplotlib_date` for `UTCDateTime` objects to
+     get matplotlib datetime float representation (which can be used in
+     time-based matplotlib axes, e.g. by Stream.plot()).
+   * Trace.times() has new options `type` and `reftime` to support fetching an
+     array of sampletimes in various different timing varieties ("relative":
+     the old default, float relative to trace starttime or `reftime` in
+     seconds; "utcdatetime": absolute times as UTCDateTime objects;
+     "timestamp": array of float POSIX timestamps, compare
+     `UTCDateTime.timestamp`; "matplotlib": array of float matplotlib dates,
+     useful for plotting on matplotlib time axes; see #1307)
+ - obspy.clients.fdsn:
    * The mass downloader now has `exclude_networks` and `exclude_stations`
      arguments to not download certain pieces of data. (see #1305)
    * The mass downloader can now download stations that are part of a given
      inventory object.
+ - obspy.css
+    * Read support for NNSA KB Core format waveform data. (see #1332)
+ - obspy.imaging.cm
+   * new colormap: viridis_white. This is a modification of viridis that
+     goes to white instead of yellow but remains perceptually uniform. It
+     is especially useful for printing when an image should merge with the
+     white background.
+ - obspy.scripts:
+   * obspy-scan command line script now also plots and prints overlaps
+     alongside gaps (see #1366)
 
-1.0.x:
+1.0.2: (doi: 10.5281/zenodo.49636)
+ - obspy.db:
+   * Fixed a bug in obspy-indexer command line script (see #1369,
+     command line script was not working, probably since 0.10.0)
+
+1.0.1: (doi: 10.5281/zenodo.48254)
+ - General:
+   * Some methods might have unnecessarily upcasted float32 arrays to float64.
+     Now methods for which it makes sense and which don't lose accuracy don't
+     upcast float32 arrays. Integers are still upcasted. Trace.resample() will
+     also no longer return the original dtype which might have resulted in a
+     large loss of accuracy but it now always returns float64 arrays.
+     (see #1302)
  - obspy.core:
-    * Trace.normalize() does no longer divide by zero in case an all-zeros
-      data trace is being used. (see #1343)
+   * Trace.normalize() does no longer divide by zero in case an all-zeros
+     data trace is being used. (see #1343)
+   * Inventory.select() and consorts now behave as expected even with empty
+     child elements. (see #1126, #1348)
+   * Code formatting is no longer checked for clean release versions. Thus
+     updates to the linters no longer break the tests for releases.
+     (see #1312)
+   * remove_response(..., pre_file=None, plot=True) works again. (see #1320)
+ - obspy.clients.arclink:
+   * Restored ArcLink encryption support. (see #1352, #1347)
  - obspy.clients.fdsn:
-    * Local URLs are now recognized as valid URLs. (see #1309)
-    * Some bug fixes for the mass downloader. (see #1293, #1304)
+   * Local URLs are now recognized as valid URLs. (see #1309)
+   * Some bug fixes for the mass downloader. (see #1293, #1304)
+   * The NOA node has been added to the list of known nodes.
+     (see 2347a25714bc3e16068031f4b6138fafd627d34e)
+ - obspy.io.sac:
+   * More automatic merging of SAC and ObsPy headers. The new `obspy.io.sac`
+     modules thus behaves more like the old one and more in line with
+     expectations of users. (see #1285)
+   * No more out of bounds errors when assigning coordinates. (see #1300)
+   * The evdp header can be set again. (see #1345)
+   * Correctly propagating sampling rate changes to the SAC headers.
+     (see #1317)
+   * Always set nvhdr, leven, lovrok, iftype to ensure valid SAC files.
+     (see #1204)
+ - obspy.io.xseed:
+   * The Parser.get_paz() method now works with multiple blockette 53s.
+     (see #1281)
  - obspy.taup
-   * fixed wrong azimuth direction for paths > 180 degrees distance (see #1289)
-   * azimuth is appended to arrivals as well (see #1289)
+   * Fixed wrong azimuth direction for paths > 180 degrees distance (see #1289)
+   * Azimuth is appended to arrivals as well (see #1289)
+   * Fixed issue with taup cache function on Python 2.7. (see #1308)
 
 1.0.0: (doi: 10.5281/zenodo.46151)
  - General:
