@@ -872,7 +872,6 @@ def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
     elif isinstance(wavefiles, list):
         wavefiles = wavefiles
     else:
-        print(type(wavefiles))
         raise IOError(wavefiles + ' is neither string or list')
     # Determine name from origin time
     try:

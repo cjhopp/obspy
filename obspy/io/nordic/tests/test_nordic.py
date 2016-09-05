@@ -430,6 +430,7 @@ class TestNordicMethods(unittest.TestCase):
                                                '..', '..', 'nlloc', 'tests',
                                                'data', 'nlloc.hyp')))
 
+
 def full_test_event():
     """
     Function to generate a basic, full test event
