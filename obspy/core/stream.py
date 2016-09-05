@@ -1077,7 +1077,7 @@ class Stream(object):
             ``(latitude, longitude)``.
         :type plot_dx: int, optional
         :param plot_dx: Spacing of ticks on the spatial x-axis.
-            Either km or degree, depending on ``dist_degree``.
+            Either m or degree, depending on ``dist_degree``.
         :type recordstart: int or float, optional
         :param recordstart: Seconds to crop from the beginning.
         :type recordlength: int or float, optional
@@ -1094,6 +1094,10 @@ class Stream(object):
         :type orientation: str, optional
         :param orientation: The orientation of the time axis, either
             ``'vertical'`` or ``'horizontal'``. Defaults to ``'vertical'``.
+        :type fillcolors: tuple, optional
+        :param fillcolors:  Fill the inside of the lines (wiggle plot),
+            for both the positive and negative sides; use ``None`` to omit
+            one of the sides. Defaults to ``(None,None)``.
 
         **Relative Parameters**
 
@@ -1449,17 +1453,18 @@ class Stream(object):
             given ``fill_value``. Defaults to ``False``.
         :type nearest_sample: bool, optional
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
 
         :type fill_value: int, float or ``None``, optional
         :param fill_value: Fill value for gaps. Defaults to ``None``. Traces
@@ -1583,17 +1588,19 @@ class Stream(object):
             Defaults to ``False``.
         :type nearest_sample: bool, optional
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
+
         :return: :class:`~obspy.core.stream.Stream`
 
         .. note::
@@ -1675,17 +1682,18 @@ class Stream(object):
             shorter then 99.9 % of the desired length are returned.
         :type include_partial_windows: bool
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
         :type nearest_sample: bool, optional
         """
         starttime = min(tr.stats.starttime for tr in self)
@@ -2046,6 +2054,7 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
                         simulate_sensitivity=simulate_sensitivity, **kwargs)
         return self
 
+    @raise_if_masked
     def filter(self, type, **options):
         """
         Filter the data of all traces in the Stream.

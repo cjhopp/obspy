@@ -39,10 +39,58 @@ from obspy.core.util import AttribDict
 
 
 class QuantityError(AttribDict):
-    uncertainty = None
-    lower_uncertainty = None
-    upper_uncertainty = None
-    confidence_level = None
+    """
+    Uncertainty information for a physical quantity.
+
+    :type uncertainty: float
+    :param uncertainty: Uncertainty as the absolute value of symmetric
+        deviation from the main value.
+    :type lower_uncertainty: float
+    :param lower_uncertainty: Uncertainty as the absolute value of deviation
+        from the main value towards smaller values.
+    :type upper_uncertainty: float
+    :param upper_uncertainty: Uncertainty as the absolute value of deviation
+        from the main value towards larger values.
+    :type confidence_level: float
+    :param confidence_level: Confidence level of the uncertainty, given in
+        percent (0-100).
+    """
+    defaults = {"uncertainty": None, "lower_uncertainty": None,
+                "upper_uncertainty": None, "confidence_level": None}
+    warn_on_non_default_key = True
+
+    def __init__(self, uncertainty=None, lower_uncertainty=None,
+                 upper_uncertainty=None, confidence_level=None):
+        super(QuantityError, self).__init__()
+        self.uncertainty = uncertainty
+        self.lower_uncertainty = lower_uncertainty
+        self.upper_uncertainty = upper_uncertainty
+        self.confidence_level = confidence_level
+
+    def __bool__(self):
+        """
+        Boolean testing for QuantityError.
+
+        QuantityError evaluates ``True`` if any of the default fields is not
+        ``None``.
+
+        >>> err = QuantityError()
+        >>> bool(err)
+        False
+        >>> err.custom_field = "spam"
+        >>> bool(err)
+        False
+        >>> err.uncertainty = 0.05
+        >>> bool(err)
+        True
+        >>> del err.custom_field
+        >>> bool(err)
+        True
+        """
+        return any([getattr(self, key) is not None for key in self.defaults])
+
+    # Python 2 compatibility
+    __nonzero__ = __bool__
 
 
 def _bool(value):
@@ -130,8 +178,9 @@ def _event_type_class_factory(class_name, class_attributes=[],
         ValueError: Setting attribute "some_letters" failed. ...
 
     If you pass ``ATTRIBUTE_HAS_ERRORS`` as the third tuple item for the
-    class_attributes, an error QuantityError will be be created that will be
-    named like the attribute with "_errors" appended.
+    class_attributes, a error (type
+    :class:`~obspy.core.event.base.QuantityError`) will be be created that will
+    be named like the attribute with "_errors" appended.
 
         >>> assert(hasattr(test_event, "some_error_quantity_errors"))
         >>> test_event.some_error_quantity_errors  # doctest: +ELLIPSIS
@@ -150,6 +199,10 @@ def _event_type_class_factory(class_name, class_attributes=[],
         for key, value in _properties:
             _property_dict[key] = value
         _containers = class_contains
+        warn_on_non_default_key = True
+        defaults = dict.fromkeys(class_contains, [])
+        defaults.update(dict.fromkeys(_property_keys, None))
+        do_not_warn_on = ["extra"]
 
         def __init__(self, *args, **kwargs):
             # Make sure the args work as expected. Therefore any specified
@@ -217,11 +270,11 @@ def _event_type_class_factory(class_name, class_attributes=[],
                 repr_str = value.__repr__()
                 # Print any associated errors.
                 error_key = key + "_errors"
-                if hasattr(self, error_key) and\
-                   _bool(getattr(self, error_key)):
+                if self.get(error_key, False):
                     err_items = sorted(getattr(self, error_key).items())
                     repr_str += " [%s]" % ', '.join(
-                        [str(k) + "=" + str(v) for k, v in err_items])
+                        sorted([str(k) + "=" + str(v) for k, v in err_items
+                                if v is not None]))
                 return repr_str
 
             # Case 2: Short representation for small objects. Will just print a
@@ -244,7 +297,7 @@ def _event_type_class_factory(class_name, class_attributes=[],
             if containers:
                 # Print delimiter only if there are attributes.
                 if attributes:
-                    ret_str += '\n\t---------'
+                    ret_str += '\n\t' + '---------'.rjust(max_length + 5)
                 element_str = "%" + str(max_length) + "s: %i Elements"
                 ret_str += "\n\t" + \
                     "\n\t".join(
@@ -507,6 +560,9 @@ class ResourceIdentifier(object):
             self.fixed = False
             self._prefix = prefix
             self._uuid = str(uuid4())
+        elif isinstance(id, ResourceIdentifier):
+            self.__dict__.update(id.__dict__)
+            return
         else:
             self.fixed = True
             self.id = id
@@ -774,12 +830,14 @@ class CreationInfo(__CreationInfo):
 
     :type agency_id: str, optional
     :param agency_id: Designation of agency that published a resource.
-    :type agency_uri: :class:`~obspy.core.event.ResourceIdentifier`, optional
+    :type agency_uri: :class:`~obspy.core.event.base.ResourceIdentifier`,
+        optional
     :param agency_uri: Resource Identifier of the agency that published a
         resource.
     :type author: str, optional
     :param author: Name describing the author of a resource.
-    :type author_uri: :class:`~obspy.core.event.ResourceIdentifier`, optional
+    :type author_uri: :class:`~obspy.core.event.base.ResourceIdentifier`,
+        optional
     :param author_uri: Resource Identifier of the author of a resource.
     :type creation_time: :class:`~obspy.core.utcdatetime.UTCDateTime`, optional
     :param creation_time: Time of creation of a resource.
@@ -851,28 +909,28 @@ class CompositeTime(__CompositeTime):
 
     :type year: int
     :param year: Year or range of years of the event's focal time.
-    :type year_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type year_errors: :class:`~obspy.core.event.base.QuantityError`
     :param year_errors: AttribDict containing error quantities.
     :type month: int
     :param month: Month or range of months of the event’s focal time.
-    :type month_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type month_errors: :class:`~obspy.core.event.base.QuantityError`
     :param month_errors: AttribDict containing error quantities.
     :type day: int
     :param day: Day or range of days of the event’s focal time.
-    :type day_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type day_errors: :class:`~obspy.core.event.base.QuantityError`
     :param day_errors: AttribDict containing error quantities.
     :type hour: int
     :param hour: Hour or range of hours of the event’s focal time.
-    :type hour_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type hour_errors: :class:`~obspy.core.event.base.QuantityError`
     :param hour_errors: AttribDict containing error quantities.
     :type minute: int
     :param minute: Minute or range of minutes of the event’s focal time.
-    :type minute_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type minute_errors: :class:`~obspy.core.event.base.QuantityError`
     :param minute_errors: AttribDict containing error quantities.
     :type second: float
     :param second: Second and fraction of seconds or range of seconds with
         fraction of the event’s focal time.
-    :type second_errors: :class:`~obspy.core.util.attribdict.AttribDict`
+    :type second_errors: :class:`~obspy.core.event.base.QuantityError`
     :param second_errors: AttribDict containing error quantities.
 
     >>> print(CompositeTime(2011, 1, 1))
@@ -903,12 +961,13 @@ class Comment(__Comment):
 
     :type text: str
     :param text: Text of comment.
-    :type resource_id: :class:`~obspy.core.event.ResourceIdentifier`, optional
+    :type resource_id: :class:`~obspy.core.event.base.ResourceIdentifier`,
+        optional
     :param resource_id: Resource identifier of comment.
     :type force_resource_id: bool, optional
     :param force_resource_id: If set to False, the automatic initialization of
         `resource_id` attribute in case it is not specified will be skipped.
-    :type creation_info: :class:`~obspy.core.event.CreationInfo`, optional
+    :type creation_info: :class:`~obspy.core.event.base.CreationInfo`, optional
     :param creation_info: Creation info for the comment.
 
     >>> comment = Comment(text="Some comment")
@@ -963,7 +1022,8 @@ class WaveformStreamID(__WaveformStreamID):
     :param location_code: Location code.
     :type channel_code: str, optional
     :param channel_code: Channel code.
-    :type resource_uri: :class:`~obspy.core.event.ResourceIdentifier`, optional
+    :type resource_uri: :class:`~obspy.core.event.base.ResourceIdentifier`,
+        optional
     :param resource_uri: Resource identifier for the waveform stream.
     :type seed_string: str, optional
     :param seed_string: Provides an alternative initialization way by passing a
@@ -1082,16 +1142,9 @@ class DataUsed(__DataUsed):
     moment-tensor inversion.
 
     :type wave_type: str
-    :param wave_type: Type of waveform data. This can be one of the following
-        values:
-
-        * ``"P waves"``,
-        * ``"body waves"``,
-        * ``"surface waves"``,
-        * ``"mantle waves"``,
-        * ``"combined"``,
-        * ``"unknown"``
-
+    :param wave_type: Type of waveform data.
+        See :class:`~obspy.core.event.header.DataUsedWaveType` for allowed
+        values.
     :type station_count: int, optional
     :param station_count: Number of stations that have contributed data of the
         type given in wave_type.

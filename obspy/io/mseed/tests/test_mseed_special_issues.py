@@ -21,9 +21,10 @@ from obspy import Stream, Trace, UTCDateTime, read
 from obspy.core.compatibility import from_buffer
 from obspy.core.util import NamedTemporaryFile
 from obspy.core.util.attribdict import AttribDict
+from obspy.io.mseed import InternalMSEEDReadingError, \
+    InternalMSEEDReadingWarning
 from obspy.io.mseed import util
-from obspy.io.mseed.core import _read_mseed, _write_mseed, \
-    InternalMSEEDReadingError, InternalMSEEDReadingWarning
+from obspy.io.mseed.core import _read_mseed, _write_mseed
 from obspy.io.mseed.headers import clibmseed
 from obspy.io.mseed.msstruct import _MSStruct
 
@@ -660,6 +661,10 @@ class MSEEDSpecialIssueTestCase(unittest.TestCase):
         np.testing.assert_array_equal(data_m, data_r)
         np.testing.assert_array_equal(data_m, data_q)
 
+    @unittest.skipIf(
+        "CONDAFORGE" in os.environ and
+        os.environ.get("APPVEYOR", "false").lower() == "true",
+        'Test is known to fail when building conda package in Appveyor.')
     def test_infinite_loop(self):
         """
         Tests that libmseed doesn't enter an infinite loop on buggy files.
@@ -751,6 +756,100 @@ class MSEEDSpecialIssueTestCase(unittest.TestCase):
 
             self.assertEqual(tr2.stats.starttime, starttime)
             self.assertEqual(tr2, tr)
+
+    def test_reading_noise_records(self):
+        """
+        Tests reading a noise record. See #1495.
+        """
+        file = os.path.join(self.path, "data",
+                            "single_record_plus_noise_record.mseed")
+        st = read(file)
+        self.assertEqual(len(st), 1)
+        tr = st[0]
+        self.assertEqual(tr.id, "IM.NV32..BHE")
+        self.assertEqual(tr.stats.npts, 277)
+        self.assertEqual(tr.stats.sampling_rate, 40.0)
+
+    def test_read_file_with_various_noise_records(self):
+        """
+        Tests reading a custom made file with noise records.
+        """
+        # This file has the following layout:
+        # 1. 256 byte NOISE record
+        # 2. 512 byte normal record - station NV30
+        # 3. 128 byte NOISE record
+        # 4. 512 byte normal record - station NV31
+        # 5. 512 byte NOISE record
+        # 6. 512 byte NOISE record
+        # 7. 512 byte normal record - station NV32
+        # 8. 1024 byte NOISE record
+        # 9. 512 byte normal record - station NV33
+        file = os.path.join(self.path, "data", "various_noise_records.mseed")
+        st = read(file)
+
+        self.assertTrue(len(st), 4)
+        self.assertTrue(st[0].stats.station, "NV30")
+        self.assertTrue(st[1].stats.station, "NV31")
+        self.assertTrue(st[2].stats.station, "NV32")
+        self.assertTrue(st[3].stats.station, "NV33")
+
+        # Data is the same across all records.
+        np.testing.assert_allclose(st[0].data, st[1].data)
+        np.testing.assert_allclose(st[0].data, st[2].data)
+        np.testing.assert_allclose(st[0].data, st[3].data)
+
+    def test_mseed_zero_data_offset(self):
+        """
+        Tests that a data offset of zero in the fixed header does not
+        confuse ObsPy.
+
+        The file contains three records: a normal one, followed by one with
+        a data-offset of zero, followed by another normal one.
+
+        This currently results in three returned traces:
+
+        * CH.PANIX..LHZ |
+          2016-08-21T01:41:19.000000Z - 2016-08-21T01:45:30.000000Z |
+          1.0 Hz, 252 samples
+        * CH.PANIX..LHZ |
+          2016-08-21T01:43:37.000000Z - 2016-08-21T01:43:37.000000Z |
+          1.0 Hz, 0 samples
+        * CH.PANIX..LHZ |
+          2016-08-21T01:45:31.000000Z - 2016-08-21T01:49:52.000000Z |
+          1.0 Hz, 262 samples
+        """
+        file = os.path.join(self.path, "data", "bizarre",
+                            "mseed_data_offset_0.mseed")
+        st = read(file)
+
+        self.assertEqual(len(st), 3)
+
+        tr = st[0]
+        self.assertEqual(tr.id, "CH.PANIX..LHZ")
+        self.assertEqual(tr.stats.starttime,
+                         UTCDateTime("2016-08-21T01:41:19.000000Z"))
+        self.assertEqual(tr.stats.endtime,
+                         UTCDateTime("2016-08-21T01:45:30.000000Z"))
+        self.assertEqual(tr.stats.npts, len(tr.data))
+        self.assertEqual(tr.stats.npts, 252)
+
+        tr = st[1]
+        self.assertEqual(tr.id, "CH.PANIX..LHZ")
+        self.assertEqual(tr.stats.starttime,
+                         UTCDateTime("2016-08-21T01:43:37.000000Z"))
+        self.assertEqual(tr.stats.endtime,
+                         UTCDateTime("2016-08-21T01:43:37.000000Z"))
+        self.assertEqual(tr.stats.npts, len(tr.data))
+        self.assertEqual(tr.stats.npts, 0)
+
+        tr = st[2]
+        self.assertEqual(tr.id, "CH.PANIX..LHZ")
+        self.assertEqual(tr.stats.starttime,
+                         UTCDateTime("2016-08-21T01:45:31.000000Z"))
+        self.assertEqual(tr.stats.endtime,
+                         UTCDateTime("2016-08-21T01:49:52.000000Z"))
+        self.assertEqual(tr.stats.npts, len(tr.data))
+        self.assertEqual(tr.stats.npts, 262)
 
 
 def suite():

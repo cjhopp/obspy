@@ -26,7 +26,8 @@ from obspy.core.utcdatetime import UTCDateTime
 from obspy.core.util import AttribDict, create_empty_data_chunk
 from obspy.core.util.base import _get_function_from_entry_point
 from obspy.core.util.decorator import raise_if_masked, skip_if_no_data
-from obspy.core.util.misc import flat_not_masked_contiguous, get_window_times
+from obspy.core.util.misc import (flat_not_masked_contiguous, get_window_times,
+                                  limit_numpy_fft_cache)
 
 
 class Stats(AttribDict):
@@ -807,6 +808,41 @@ class Trace(object):
 
     id = property(get_id)
 
+    @id.setter
+    def id(self, value):
+        """
+        Set network, station, location and channel codes from a SEED ID.
+
+        Raises an Exception if the provided ID does not contain exactly three
+        dots (or is not of type `str`).
+
+        >>> from obspy import read
+        >>> tr = read()[0]
+        >>> print(tr)  # doctest: +ELLIPSIS
+        BW.RJOB..EHZ | 2009-08-24T00:20:03.000000Z ... | 100.0 Hz, 3000 samples
+        >>> tr.id = "GR.FUR..HHZ"
+        >>> print(tr)  # doctest: +ELLIPSIS
+        GR.FUR..HHZ | 2009-08-24T00:20:03.000000Z ... | 100.0 Hz, 3000 samples
+
+        :type value: str
+        :param value: SEED ID to use for setting `self.stats.network`,
+            `self.stats.station`, `self.stats.location` and
+            `self.stats.channel`.
+        """
+        try:
+            net, sta, loc, cha = value.split(".")
+        except AttributeError:
+            msg = ("Can only set a Trace's SEED ID from a string "
+                   "(and not from {})").format(type(value))
+            raise TypeError(msg)
+        except ValueError:
+            msg = ("Not a valid SEED ID: '{}'").format(value)
+            raise ValueError(msg)
+        self.stats.network = net
+        self.stats.station = sta
+        self.stats.location = loc
+        self.stats.channel = cha
+
     def plot(self, **kwargs):
         """
         Create a simple graph of the current trace.
@@ -1035,17 +1071,18 @@ class Trace(object):
             given ``fill_value``. Defaults to ``False``.
         :type nearest_sample: bool, optional
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
 
         :type fill_value: int, float or ``None``, optional
         :param fill_value: Fill value for gaps. Defaults to ``None``. Traces
@@ -1098,17 +1135,18 @@ class Trace(object):
         :param endtime: Specify the end time of slice.
         :type nearest_sample: bool, optional
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
 
         :return: New :class:`~obspy.core.trace.Trace` object. Does not copy
             data but just passes a reference to it.
@@ -1164,17 +1202,18 @@ class Trace(object):
             shorter then 99.9 % of the desired length are returned.
         :type include_partial_windows: bool
         :param nearest_sample: If set to ``True``, the closest sample is
-            selected, if set to ``False``, the outer (previous sample for a
-            start time border, next sample for an end time border) sample
+            selected, if set to ``False``, the inner (next sample for a
+            start time border, previous sample for an end time border) sample
             containing the time is selected. Defaults to ``True``.
 
-            Given the following trace containing 4 samples, "|" are the
+            Given the following trace containing 6 samples, "|" are the
             sample points, "A" is the requested starttime::
 
-                |        A|         |         |
+                |         |A        |         |       B |         |
+                1         2         3         4         5         6
 
-            ``nearest_sample=True`` will select the second sample point,
-            ``nearest_sample=False`` will select the first sample point.
+            ``nearest_sample=True`` will select samples 2-5,
+            ``nearest_sample=False`` will select samples 3-4 only.
         :type nearest_sample: bool, optional
         """
         windows = get_window_times(
@@ -1373,6 +1412,7 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
         return self
 
     @_add_processing_info
+    @raise_if_masked
     def filter(self, type, **options):
         """
         Filter the data of the current trace.
@@ -2639,6 +2679,8 @@ seismometer_correction_simulation.html#using-a-resp-file>`_.
             plot is saved to file (filename must have a valid image suffix
             recognizable by matplotlib e.g. '.png').
         """
+        limit_numpy_fft_cache()
+
         from obspy.core.inventory import PolynomialResponseStage
         from obspy.signal.invsim import (cosine_taper, cosine_sac_taper,
                                          invert_spectrum)

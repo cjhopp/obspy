@@ -162,6 +162,8 @@ class Client(object):
             raise ValueError(msg)
         sds_type = sds_type or self.sds_type
 
+        seed_pattern = ".".join((network, station, location, channel))
+
         st = Stream()
         full_paths = self._get_filenames(
             network=network, station=station, location=location,
@@ -169,7 +171,7 @@ class Client(object):
             sds_type=sds_type)
         for full_path in full_paths:
             st += read(full_path, format=self.format, starttime=starttime,
-                       endtime=endtime, **kwargs)
+                       endtime=endtime, sourcename=seed_pattern, **kwargs)
 
         # make sure we only have the desired data, just in case the file
         # contents do not match the expected SEED id
@@ -307,11 +309,17 @@ class Client(object):
         # subsequently in a place were it's not caught
         # see https://bugs.python.org/issue4180
         # see e.g. http://blog.ionelmc.ro/2013/06/26/testing-python-warnings/
-        from obspy.core.stream import __warningregistry__ as \
-            stream_warningregistry
-        for key in list(stream_warningregistry.keys()):
-            if key[0] == _headonly_warning_msg:
-                stream_warningregistry.pop(key)
+        try:
+            from obspy.core.stream import __warningregistry__ as \
+                stream_warningregistry
+        except ImportError:
+            # import error means no warning has been issued from
+            # obspy.core.stream before, so nothing to do.
+            pass
+        else:
+            for key in list(stream_warningregistry.keys()):
+                if key[0] == _headonly_warning_msg:
+                    stream_warningregistry.pop(key)
         st.sort(keys=['starttime', 'endtime'])
         st.traces = [tr for tr in st
                      if not (tr.stats.endtime < starttime or
@@ -363,6 +371,8 @@ class Client(object):
         """
         sds_type = sds_type or self.sds_type
 
+        seed_pattern = ".".join((network, station, location, channel))
+
         if not self.has_data(
                 network=network, station=station, location=location,
                 channel=channel, sds_type=sds_type):
@@ -379,7 +389,8 @@ class Client(object):
                 network=network, station=station, location=location,
                 channel=channel, time=time, sds_type=sds_type)
             if os.path.isfile(filename):
-                st = read(filename, format=self.format, headonly=True)
+                st = read(filename, format=self.format, headonly=True,
+                          sourcename=seed_pattern)
                 st = st.select(network=network, station=station,
                                location=location, channel=channel)
                 if st:

@@ -150,9 +150,12 @@ class WaveformPluginsTestCase(unittest.TestCase):
                         self.assertEqual(st[0].stats.delta, 0.005)
                         self.assertEqual(st[0].stats.sampling_rate, 200.0)
                     # network/station/location/channel codes
-                    if format in ['Q', 'SH_ASC', 'GSE2']:
-                        # no network or location code in Q, SH_ASC, GSE2
+                    if format in ['Q', 'SH_ASC']:
+                        # no network or location code in Q, SH_ASC
                         self.assertEqual(st[0].id, ".MANZ1..EHE")
+                    elif format == "GSE2":
+                        # no location code in GSE2
+                        self.assertEqual(st[0].id, "BW.MANZ1..EHE")
                     elif format not in ['WAV']:
                         self.assertEqual(st[0].id, "BW.MANZ1.00.EHE")
 
@@ -166,6 +169,10 @@ class WaveformPluginsTestCase(unittest.TestCase):
                          '2011-09-06-1311-36S.A1032_001BH_Z_MSEED'),
             os.path.join('core', 'tests', 'data',
                          'IU_ULN_00_LH1_2015-07-18T02.mseed'),
+            # That file is not in obspy.io.mseed as it is used to test an
+            # issue with the uncompress_data() decorator.
+            os.path.join('core', 'tests', 'data',
+                         'tarfile_impostor.mseed')
         ]
         formats_ep = _get_default_eps('obspy.plugin.waveform', 'isFormat')
         formats = list(formats_ep.values())
@@ -179,6 +186,7 @@ class WaveformPluginsTestCase(unittest.TestCase):
             all_paths.append(path)
             if os.path.exists(path):
                 paths[f.name] = path
+
         msg = 'Test data directories do not exist:\n    '
         self.assertTrue(len(paths) > 0, msg + '\n    '.join(all_paths))
         # Collect all false positives.
@@ -466,6 +474,16 @@ class WaveformPluginsTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             for obj in stream_trace:
                 obj.write("temp.random_suffix")
+
+    def test_reading_tarfile_impostor(self):
+        """
+        Tests that a file, that by chance is interpreted as a valid tar file
+        can be read by ObsPy and is not treated as a tar file.
+
+        See #1436.
+        """
+        st = read("/path/to/tarfile_impostor.mseed")
+        self.assertEqual(st[0].id, "10.864.1B.004")
 
 
 def suite():

@@ -33,6 +33,9 @@ class CoreTestCase(unittest.TestCase):
         self.file = os.path.join(self.path, 'data', 'test.sac')
         self.filexy = os.path.join(self.path, 'data', 'testxy.sac')
         self.filebe = os.path.join(self.path, 'data', 'test.sac.swap')
+        self.fileseis = os.path.join(self.path, "data", "seism.sac")
+        self.file_notascii = os.path.join(self.path, "data",
+                                          "non_ascii.sac")
         self.testdata = np.array(
             [-8.74227766e-08, -3.09016973e-01,
              -5.87785363e-01, -8.09017122e-01, -9.51056600e-01,
@@ -276,8 +279,7 @@ class CoreTestCase(unittest.TestCase):
         starttime of the seismogram is calculated by adding the B header
         (in seconds) to the SAC reference time.
         """
-        file = os.path.join(self.path, "data", "seism.sac")
-        tr = read(file)[0]
+        tr = read(self.fileseis)[0]
         # see that starttime is set correctly (#107)
         self.assertAlmostEqual(tr.stats.sac.iztype, 9)
         self.assertAlmostEqual(tr.stats.sac.b, 9.4599991)
@@ -838,6 +840,49 @@ class CoreTestCase(unittest.TestCase):
             tr1 = read(tempfile)[0]
         self.assertEqual(tr1.stats.sac.npts, tr.stats.sac.npts / 2)
         self.assertEqual(tr1.stats.sac.delta, tr.stats.sac.delta * 2)
+
+    def test_invalid_header_field(self):
+        """
+        Given a SAC file on disk, when it is read and an invalid header is
+        appended to the stats.sac dictionary, then the invalid header should be
+        ignored (user given a warning) and the written file should be the same
+        as the original.
+        """
+        tr = read(self.file, format='SAC')[0]
+
+        with io.BytesIO() as buf:
+            tr.write(buf, format='SAC')
+            buf.seek(0, 0)
+
+            tr.stats.sac.AAA = 10.
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter('always')
+                with io.BytesIO() as buf1:
+                    tr.write(buf1, format='SAC')
+                    self.assertIn('Ignored', str(w[-1].message))
+                    buf1.seek(0, 0)
+
+                    self.assertEqual(buf.read(), buf1.read())
+
+    def test_not_ascii(self):
+        """
+        Read file with non-ascii and null-termination characters.
+        See ObsPy issue #1432
+        """
+        tr = read(self.file_notascii, format='SAC')[0]
+        self.assertEqual(tr.stats.station, 'ALS')
+        self.assertEqual(tr.stats.channel, 'HHE')
+        self.assertEqual(tr.stats.network, '')
+
+    def test_sac_booleans_from_trace(self):
+        """
+        SAC booleans "lcalda" and "lpspol" should be "False" and "True",
+        respectively, by default when converting from a "Trace".
+        """
+        tr = Trace()
+        sac = SACTrace.from_obspy_trace(tr)
+        self.assertFalse(sac.lcalda)
+        self.assertTrue(sac.lpspol)
 
 
 def suite():

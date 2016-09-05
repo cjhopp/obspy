@@ -506,18 +506,18 @@ class Client(object):
         :type network: str
         :param network: Select one or more network codes. Can be SEED network
             codes or data center defined codes. Multiple codes are
-            comma-separated.
+            comma-separated (e.g. ``"IU,TA"``).
         :type station: str
         :param station: Select one or more SEED station codes. Multiple codes
-            are comma-separated.
+            are comma-separated (e.g. ``"ANMO,PFO"``).
         :type location: str
         :param location: Select one or more SEED location identifiers. Multiple
-            identifiers are comma-separated. As a special case ``“--“`` (two
-            dashes) will be translated to a string of two space characters to
-            match blank location IDs.
+            identifiers are comma-separated (e.g. ``"00,01"``).  As a
+            special case ``“--“`` (two dashes) will be translated to a string
+            of two space characters to match blank location IDs.
         :type channel: str
         :param channel: Select one or more SEED channel codes. Multiple codes
-            are comma-separated.
+            are comma-separated (e.g. ``"BHZ,HHZ"``).
         :type minlatitude: float
         :param minlatitude: Limit to stations with a latitude larger than the
             specified minimum.
@@ -647,16 +647,17 @@ class Client(object):
         :type network: str
         :param network: Select one or more network codes. Can be SEED network
             codes or data center defined codes. Multiple codes are
-            comma-separated. Wildcards are allowed.
+            comma-separated (e.g. ``"IU,TA"``). Wildcards are allowed.
         :type station: str
         :param station: Select one or more SEED station codes. Multiple codes
-            are comma-separated. Wildcards are allowed.
+            are comma-separated (e.g. ``"ANMO,PFO"``). Wildcards are allowed.
         :type location: str
         :param location: Select one or more SEED location identifiers. Multiple
-            identifiers are comma-separated. Wildcards are allowed.
+            identifiers are comma-separated (e.g. ``"00,01"``). Wildcards are
+            allowed.
         :type channel: str
         :param channel: Select one or more SEED channel codes. Multiple codes
-            are comma-separated.
+            are comma-separated (e.g. ``"BHZ,HHZ"``).
         :type starttime: :class:`~obspy.core.utcdatetime.UTCDateTime`
         :param starttime: Limit results to time series samples on or after the
             specified start time
@@ -935,8 +936,7 @@ class Client(object):
             Sending institution: IRIS-DMC (IRIS-DMC)
             Contains:
                 Networks (2):
-                    GR
-                    IU
+                    GR, IU
                 Stations (2):
                     GR.GRA1 (GRAFENBERG ARRAY, BAYERN)
                     IU.ANMO (Albuquerque, New Mexico, USA)
@@ -966,13 +966,12 @@ class Client(object):
             Sending institution: IRIS-DMC (IRIS-DMC)
             Contains:
                 Networks (2):
-                    GR
-                    IU
+                    GR, IU
                 Stations (2):
                     GR.GRA1 (GRAFENBERG ARRAY, BAYERN)
                     IU.ANMO (Albuquerque, New Mexico, USA)
                 Channels (5):
-                    GR.GRA1..BHE, GR.GRA1..BHN, GR.GRA1..BHZ, IU.ANMO.00.BHZ,
+                    GR.GRA1..BHZ, GR.GRA1..BHN, GR.GRA1..BHE, IU.ANMO.00.BHZ,
                     IU.ANMO.10.BHZ
         >>> inv = client.get_stations_bulk("/tmp/request.txt") \
         ...     # doctest: +SKIP
@@ -1131,6 +1130,14 @@ class Client(object):
                     raise TypeError(msg)
             # Now attempt to convert the parameter to the correct type.
             this_type = service_params[key]["type"]
+
+            # Try to decode to be able to work with bytes.
+            if this_type is native_str:
+                try:
+                    value = value.decode()
+                except AttributeError:
+                    pass
+
             try:
                 value = this_type(value)
             except:
@@ -1140,7 +1147,7 @@ class Client(object):
             # Now convert to a string that is accepted by the webservice.
             value = convert_to_string(value)
             if isinstance(value, (str, native_str)):
-                if not value:
+                if not value and key != "location":
                     continue
             final_parameter_set[key] = value
 
@@ -1632,6 +1639,11 @@ def download_url(url, opener, timeout=10, headers={}, debug=False,
     if debug is True:
         print("Downloading %s %s requesting gzip compression" % (
             url, "with" if use_gzip else "without"))
+        if data:
+            print("Sending along the following payload:")
+            print("-" * 70)
+            print(data.decode())
+            print("-" * 70)
 
     try:
         request = urllib.request.Request(url=url, headers=headers)
