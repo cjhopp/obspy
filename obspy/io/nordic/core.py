@@ -813,13 +813,17 @@ def blanksfile(wavefile, evtype, userID, outdir, overwrite=False,
     return sfile
 
 
-def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
+def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
+                 wavefiles='DUMMY', explosion=False,
                  overwrite=False):
     """
     Write an obspy.event to a nordic formatted s-file.
 
     :type event: obspy.core.event.Event
     :param event: A single obspy event
+    :type filename: str
+    :param filename: Filname to write to, can be None, and filename will be \
+        generated from the origin time in seisan format.
     :type userID: str
     :param userID: Up to 4 character user ID
     :type evtype: str
@@ -840,7 +844,7 @@ def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
     .. note:: Seisan can find waveforms either by their relative or absolute \
         path, or by looking for the file recursively in directories within \
         the WAV directory in your seisan install.  Because all lines need to \
-        be less than 79 ccharacterslong (fortran hangover) in the s-files, \
+        be less than 79 characters long (fortran hangover) in the s-files, \
         you will need to determine whether the full-path is okay or not.
     """
     import datetime
@@ -848,8 +852,8 @@ def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
     from obspy.core.event import Catalog, Event
     # First we need to work out what to call the s-file and open it
     # Check that user ID is the correct length
-    if len(userID) != 4:
-        raise IOError('User ID must be 4 characters long')
+    if len(userid) != 4:
+        raise IOError('%s User ID must be 4 characters long' % userid)
     # Check that outdir exists
     if not os.path.isdir(outdir):
         raise IOError('Out path does not exist, I will not create this: ' +
@@ -884,23 +888,26 @@ def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
             'This is required!'
         raise ValueError(msg)
     # Attempt to cope with possible pre-existing files
-    range_list = []
-    for i in range(30):  # Look +/- 30 seconds around origin time
-        range_list.append(i)
-        range_list.append(-1 * i)
-    range_list = range_list[1:]
-    for add_secs in range_list:
-        sfilename = (evtime + add_secs).datetime.strftime('%d-%H%M-%S') +\
-            evtype[0] + '.S' + (evtime + add_secs).datetime.strftime('%Y%m')
-        if not os.path.isfile(outdir + os.sep + sfilename):
-            sfile = open(outdir + os.sep + sfilename, 'w')
-            break
-        elif overwrite:
-            sfile = open(outdir + os.sep + sfilename, 'w')
-            break
+    if not filename:
+        range_list = []
+        for i in range(30):  # Look +/- 30 seconds around origin time
+            range_list.append(i)
+            range_list.append(-1 * i)
+        range_list = range_list[1:]
+        for add_secs in range_list:
+            sfilename = (evtime + add_secs).datetime.strftime('%d-%H%M-%S') +\
+                evtype[0] + '.S' + (evtime + add_secs).datetime.strftime('%Y%m')
+            if not os.path.isfile(outdir + os.sep + sfilename):
+                sfile = open(outdir + os.sep + sfilename, 'w')
+                break
+            elif overwrite:
+                sfile = open(outdir + os.sep + sfilename, 'w')
+                break
+        else:
+            raise IOError(outdir + os.sep + sfilename +
+                          ' already exists, will not overwrite')
     else:
-        raise IOError(outdir + os.sep + sfilename +
-                      ' already exists, will not overwrite')
+        sfile = open(outdir + os.sep + filename, 'w')
     # Write the header info.
     if event.origins[0].latitude:
         if event.origins[0].latitude not in [float('NaN'), 999]:
@@ -1004,7 +1011,7 @@ def eventtosfile(event, userID, evtype, outdir, wavefiles, explosion=False,
                 str(datetime.datetime.now().day).zfill(2) + ' ' +
                 str(datetime.datetime.now().hour).zfill(2) + ':' +
                 str(datetime.datetime.now().minute).zfill(2) + ' OP:' +
-                userID.ljust(4) + ' STATUS:'+'ID:'.rjust(18) +
+                userid.ljust(4) + ' STATUS:'+'ID:'.rjust(18) +
                 str(evtime.year) +
                 str(evtime.month).zfill(2) +
                 str(evtime.day).zfill(2) +

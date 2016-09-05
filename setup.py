@@ -280,6 +280,7 @@ ENTRY_POINTS = {
         'NDK = obspy.io.ndk.core',
         'NLLOC_HYP = obspy.io.nlloc.core',
         'NLLOC_OBS = obspy.io.nlloc.core',
+        'NORDIC = obspy.io.nordic.core',
         'CNV = obspy.io.cnv.core',
         'CMTSOLUTION = obspy.io.cmtsolution.core',
         'SHAPEFILE = obspy.io.shapefile.core',
@@ -334,7 +335,7 @@ ENTRY_POINTS = {
         ],
     'obspy.plugin.event.NORDIC': [
         'writeFormat = obspy.io.nordic.core:eventtosfile',
-        'readFormat = osbpy.io.nordic.code:read_event',
+        'readFormat = obspy.io.nordic.core:read_select',
         'isFormat = obspy.io.nordic.core:is_sfile'
     ],
     'obspy.plugin.inventory': [
