@@ -1177,7 +1177,6 @@ def nordpick(event):
                 CAZ = ' '
         else:
             CAZ = ' '
-            round_len = False
             distance = ' '
             timeres = ' '
             azimuthres = ' '

@@ -4,9 +4,12 @@ Functions for testing the utils.sfile_util functions
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from future.builtins import *  # NOQA @UnusedWildImport
-from obspy.io.nordic.core import *
+from obspy.io.nordic.core import is_sfile, read_spectral_info, read_event, \
+    read_select, readpicks, readwavename, blanksfile, eventtosfile, \
+    nordpick, stationtoseisan
 from obspy.io.nordic.core import _int_conv, _evmagtonor, _float_conv, \
     _nortoevmag, _str_conv
+import numpy as np
 import unittest
 import os
 from obspy import read_events, Catalog, UTCDateTime, read
@@ -180,48 +183,48 @@ class TestNordicMethods(unittest.TestCase):
         test_cat.append(full_test_event())
         with self.assertRaises(IOError):
             # Raises error due to multiple events in catalog
-            sfile = eventtosfile(test_cat, userID='TEST',
-                                 evtype='L', outdir='.',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(test_cat, userID='TEST',
+                             evtype='L', outdir='.',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to too long userID
-            sfile = eventtosfile(test_cat[0], userID='TESTICLE',
-                                 evtype='L', outdir='.',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(test_cat[0], userID='TESTICLE',
+                             evtype='L', outdir='.',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to unrecognised event type
-            sfile = eventtosfile(test_cat[0], userID='TEST',
-                                 evtype='U', outdir='.',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(test_cat[0], userID='TEST',
+                             evtype='U', outdir='.',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to no output directory
-            sfile = eventtosfile(test_cat[0], userID='TEST',
-                                 evtype='L', outdir='albatross',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(test_cat[0], userID='TEST',
+                             evtype='L', outdir='albatross',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         with self.assertRaises(TypeError):
             # Raises error due to incorrect wavefile formatting
-            sfile = eventtosfile(test_cat[0], userID='TEST',
-                                 evtype='L', outdir='.',
-                                 wavefiles=1234, explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(test_cat[0], userID='TEST',
+                             evtype='L', outdir='.',
+                             wavefiles=1234, explosion=True,
+                             overwrite=True)
         with self.assertRaises(IndexError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins = []
-            sfile = eventtosfile(invalid_origin, userID='TEST',
-                                 evtype='L', outdir='.',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(invalid_origin, userID='TEST',
+                             evtype='L', outdir='.',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         with self.assertRaises(ValueError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins[0].time = None
-            sfile = eventtosfile(invalid_origin, userID='TEST',
-                                 evtype='L', outdir='.',
-                                 wavefiles='test', explosion=True,
-                                 overwrite=True)
+            _ = eventtosfile(invalid_origin, userID='TEST',
+                             evtype='L', outdir='.',
+                             wavefiles='test', explosion=True,
+                             overwrite=True)
         # Write a near empty origin
         valid_origin = test_cat[0].copy()
         valid_origin.origins[0].latitude = None
@@ -292,7 +295,8 @@ class TestNordicMethods(unittest.TestCase):
     def test_read_extra_header(self):
         testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                     'data', 'Sfile_extra_header')
-        not_extra_header = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+        not_extra_header = os.path.join(os.path.abspath(os.path.
+                                                        dirname(__file__)),
                                         'data', '01-0411-15L.S201309')
         test_event = readpicks(testing_path)
         header_event = readpicks(not_extra_header)
