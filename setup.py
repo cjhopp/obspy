@@ -90,7 +90,7 @@ KEYWORDS = [
     'focal mechanism', 'GCF', 'GSE1', 'GSE2', 'hob', 'Tau-P', 'imaging',
     'instrument correction', 'instrument simulation', 'IRIS', 'kinemetrics',
     'KML', 'magnitude', 'MiniSEED', 'misfit', 'mopad', 'MSEED', 'NDK', 'NERA',
-    'NERIES', 'NonLinLoc', 'NLLOC', 'observatory', 'ORFEUS', 'PDAS', 'picker',
+    'NERIES', 'NonLinLoc', 'NLLOC', 'Nordic', 'observatory', 'ORFEUS', 'PDAS', 'picker',
     'processing', 'PQLX', 'Q', 'real time', 'realtime', 'RESP',
     'response file', 'RT', 'SAC', 'sc3ml', 'SDS', 'SEED', 'SeedLink', 'SEG-2',
     'SEG Y', 'SEISAN', 'SeisHub', 'Seismic Handler', 'seismology',
@@ -332,6 +332,11 @@ ENTRY_POINTS = {
     'obspy.plugin.event.KML': [
         'writeFormat = obspy.io.kml.core:_write_kml',
         ],
+    'obspy.plugin.event.NORDIC': [
+        'writeFormat = obspy.io.nordic.core:eventtosfile',
+        'readFormat = osbpy.io.nordic.code:read_event',
+        'isFormat = obspy.io.nordic.core:is_sfile'
+    ],
     'obspy.plugin.inventory': [
         'STATIONXML = obspy.io.stationxml.core',
         'SC3ML = obspy.io.seiscomp.sc3ml',
