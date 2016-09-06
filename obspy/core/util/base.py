@@ -464,8 +464,6 @@ def _read_from_plugin(plugin_type, filename, format=None, **kwargs):
         raise TypeError(msg % (format_ep.name, ', '.join(eps)))
     # read
     list_obj = read_format(filename, **kwargs)
-    print(list_obj)
-    print(format_ep.name)
     return list_obj, format_ep.name
 
 

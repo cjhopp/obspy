@@ -88,7 +88,7 @@ class TestNordicMethods(unittest.TestCase):
                          test_cat[0].amplitudes[1].category)
 
         # Check the read-write s-file functionality
-        sfile = eventtosfile(test_cat[0], userID='TEST',
+        sfile = eventtosfile(test_cat[0], userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True, overwrite=True)
         del read_cat
@@ -183,45 +183,45 @@ class TestNordicMethods(unittest.TestCase):
         test_cat.append(full_test_event())
         with self.assertRaises(IOError):
             # Raises error due to multiple events in catalog
-            _ = eventtosfile(test_cat, userID='TEST',
+            _ = eventtosfile(test_cat, userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
         with self.assertRaises(IOError):
-            # Raises error due to too long userID
-            _ = eventtosfile(test_cat[0], userID='TESTICLE',
+            # Raises error due to too long userid
+            _ = eventtosfile(test_cat[0], userid='TESTICLE',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to unrecognised event type
-            _ = eventtosfile(test_cat[0], userID='TEST',
+            _ = eventtosfile(test_cat[0], userid='TEST',
                              evtype='U', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to no output directory
-            _ = eventtosfile(test_cat[0], userID='TEST',
+            _ = eventtosfile(test_cat[0], userid='TEST',
                              evtype='L', outdir='albatross',
                              wavefiles='test', explosion=True,
                              overwrite=True)
         with self.assertRaises(TypeError):
             # Raises error due to incorrect wavefile formatting
-            _ = eventtosfile(test_cat[0], userID='TEST',
+            _ = eventtosfile(test_cat[0], userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles=1234, explosion=True,
                              overwrite=True)
         with self.assertRaises(IndexError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins = []
-            _ = eventtosfile(invalid_origin, userID='TEST',
+            _ = eventtosfile(invalid_origin, userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
         with self.assertRaises(ValueError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins[0].time = None
-            _ = eventtosfile(invalid_origin, userID='TEST',
+            _ = eventtosfile(invalid_origin, userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
@@ -230,7 +230,7 @@ class TestNordicMethods(unittest.TestCase):
         valid_origin.origins[0].latitude = None
         valid_origin.origins[0].longitude = None
         valid_origin.origins[0].depth = None
-        sfile = eventtosfile(valid_origin, userID='TEST',
+        sfile = eventtosfile(valid_origin, userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
@@ -271,12 +271,15 @@ class TestNordicMethods(unittest.TestCase):
         import os
         test_event = Event()
         with self.assertRaises(IndexError):
-            eventtosfile(test_event, 'TEST', 'L', '.', 'test')
+            eventtosfile(test_event, userid='TEST', evtype='L',
+                         outdir='.', wavefiles='test')
         test_event.origins.append(Origin())
         with self.assertRaises(ValueError):
-            eventtosfile(test_event, 'TEST', 'L', '.', 'test')
+            eventtosfile(test_event, userid='TEST', evtype='L',
+                         outdir='.', wavefiles='test')
         test_event.origins[0].time = UTCDateTime()
-        test_sfile = eventtosfile(test_event, 'TEST', 'L', '.', 'test')
+        test_sfile = eventtosfile(test_event, userid='TEST', evtype='L',
+                                  outdir='.', wavefiles='test')
         self.assertTrue(os.path.isfile(test_sfile))
         os.remove(test_sfile)
 

@@ -39,6 +39,12 @@ def is_sfile(sfile):
     """
     try:
         readheader(sfile=sfile)
+    except TypeError:
+        # Case of parsing data directly
+        try:
+            _readheader(f=sfile)
+        except IOError:
+            return False
     except IOError:
         return False
     return True
@@ -179,7 +185,10 @@ def readheader(sfile):
 
     :returns: :class: obspy.core.event.Event
     """
-    f = open(sfile, 'r')
+    if isinstance(sfile, file):
+        f = sfile
+    else:
+        f = open(sfile, 'r')
     header = _readheader(f=f)
     f.close()
     return header
@@ -308,7 +317,10 @@ def read_spectral_info(sfile):
     :returns: dictionary of spectral information, units as in seisan manual, \
         expect for logs which have been converted to floats.
     """
-    f = open(sfile, 'r')
+    if isinstance(sfile, file):
+        f = sfile
+    else:
+        f = open(sfile, 'r')
     spec_inf = _read_spectral_info(f=f)
     f.close()
     return spec_inf
@@ -474,7 +486,7 @@ def read_select(select_file):
             for event_line in event_str:
                 tmp_sfile.write(event_line)
             tmp_sfile.close()
-            catalog += read_event(tmp_sfile.name)
+            catalog += readpicks(tmp_sfile.name)
             os.remove(tmp_sfile.name)
             event_str = []
     f.close()
@@ -499,7 +511,10 @@ def readpicks(sfile):
     values stored in seisan.  Multiple weights are also not supported in \
     Obspy.event.
     """
-    f = open(sfile, 'r')
+    if isinstance(sfile, file):
+        f = sfile
+    else:
+        f = open(sfile, 'r')
     new_event = _readheader(f=f)
     wav_names = _readwavename(f=f)
     event = _read_picks(f=f, wav_names=wav_names, new_event=new_event)
@@ -690,7 +705,10 @@ def readwavename(sfile):
     :returns: List of strings of wave paths
     :rtype: list
     """
-    f = open(sfile, 'r')
+    if isinstance(sfile, file):
+        f = sfile
+    else:
+        f = open(sfile, 'r')
     wavenames = _readwavename(f=f)
     f.close()
     return wavenames
