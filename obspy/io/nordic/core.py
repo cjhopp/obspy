@@ -43,7 +43,7 @@ def is_sfile(sfile):
         # Case of parsing data directly
         try:
             _readheader(f=sfile)
-        except IOError:
+        except (IOError, AttributeError):
             return False
     except IOError:
         return False
@@ -185,10 +185,10 @@ def readheader(sfile):
 
     :returns: :class: obspy.core.event.Event
     """
-    if isinstance(sfile, file):
-        f = sfile
-    else:
+    if isinstance(sfile, str):
         f = open(sfile, 'r')
+    else:
+        f = sfile
     header = _readheader(f=f)
     f.close()
     return header
@@ -231,7 +231,7 @@ def _readheader(f):
                                                 100000)\
             + add_seconds
     except:
-        warnings.warn("Couldn't read a date from sfile: " + sfile)
+        warnings.warn("Couldn't read a date from sfile")
         new_event.origins.append(Origin(time=UTCDateTime(0)))
     # new_event.loc_mod_ind=topline[20]
     new_event.event_descriptions.append(EventDescription())
@@ -317,10 +317,10 @@ def read_spectral_info(sfile):
     :returns: dictionary of spectral information, units as in seisan manual, \
         expect for logs which have been converted to floats.
     """
-    if isinstance(sfile, file):
-        f = sfile
-    else:
+    if isinstance(sfile, str):
         f = open(sfile, 'r')
+    else:
+        f = sfile
     spec_inf = _read_spectral_info(f=f)
     f.close()
     return spec_inf
@@ -511,10 +511,10 @@ def readpicks(sfile):
     values stored in seisan.  Multiple weights are also not supported in \
     Obspy.event.
     """
-    if isinstance(sfile, file):
-        f = sfile
-    else:
+    if isinstance(sfile, str):
         f = open(sfile, 'r')
+    else:
+        f = sfile
     new_event = _readheader(f=f)
     wav_names = _readwavename(f=f)
     event = _read_picks(f=f, wav_names=wav_names, new_event=new_event)
@@ -705,10 +705,10 @@ def readwavename(sfile):
     :returns: List of strings of wave paths
     :rtype: list
     """
-    if isinstance(sfile, file):
-        f = sfile
-    else:
+    if isinstance(sfile, str):
         f = open(sfile, 'r')
+    else:
+        f = sfile
     wavenames = _readwavename(f=f)
     f.close()
     return wavenames
@@ -914,7 +914,8 @@ def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
         range_list = range_list[1:]
         for add_secs in range_list:
             sfilename = (evtime + add_secs).datetime.strftime('%d-%H%M-%S') +\
-                evtype[0] + '.S' + (evtime + add_secs).datetime.strftime('%Y%m')
+                evtype[0] + '.S' + (evtime + add_secs).\
+                datetime.strftime('%Y%m')
             if not os.path.isfile(outdir + os.sep + sfilename):
                 sfile = open(outdir + os.sep + sfilename, 'w')
                 break

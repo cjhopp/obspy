@@ -183,48 +183,48 @@ class TestNordicMethods(unittest.TestCase):
         test_cat.append(full_test_event())
         with self.assertRaises(IOError):
             # Raises error due to multiple events in catalog
-            _ = eventtosfile(test_cat, userid='TEST',
-                             evtype='L', outdir='.',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(test_cat, userid='TEST',
+                         evtype='L', outdir='.',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to too long userid
-            _ = eventtosfile(test_cat[0], userid='TESTICLE',
-                             evtype='L', outdir='.',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(test_cat[0], userid='TESTICLE',
+                         evtype='L', outdir='.',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to unrecognised event type
-            _ = eventtosfile(test_cat[0], userid='TEST',
-                             evtype='U', outdir='.',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(test_cat[0], userid='TEST',
+                         evtype='U', outdir='.',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to no output directory
-            _ = eventtosfile(test_cat[0], userid='TEST',
-                             evtype='L', outdir='albatross',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(test_cat[0], userid='TEST',
+                         evtype='L', outdir='albatross',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         with self.assertRaises(TypeError):
             # Raises error due to incorrect wavefile formatting
-            _ = eventtosfile(test_cat[0], userid='TEST',
-                             evtype='L', outdir='.',
-                             wavefiles=1234, explosion=True,
-                             overwrite=True)
+            eventtosfile(test_cat[0], userid='TEST',
+                         evtype='L', outdir='.',
+                         wavefiles=1234, explosion=True,
+                         overwrite=True)
         with self.assertRaises(IndexError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins = []
-            _ = eventtosfile(invalid_origin, userid='TEST',
-                             evtype='L', outdir='.',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(invalid_origin, userid='TEST',
+                         evtype='L', outdir='.',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         with self.assertRaises(ValueError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins[0].time = None
-            _ = eventtosfile(invalid_origin, userid='TEST',
-                             evtype='L', outdir='.',
-                             wavefiles='test', explosion=True,
-                             overwrite=True)
+            eventtosfile(invalid_origin, userid='TEST',
+                         evtype='L', outdir='.',
+                         wavefiles='test', explosion=True,
+                         overwrite=True)
         # Write a near empty origin
         valid_origin = test_cat[0].copy()
         valid_origin.origins[0].latitude = None
@@ -420,7 +420,11 @@ class TestNordicMethods(unittest.TestCase):
                     u'station': 'AVERAGE',  u'stress_drop': 0.006,
                     u'window_length': 1.6}
         for key in average.keys():
-            self.assertEqual(average.get(key), check_av.get(key))
+            if isinstance(average.get(key), str):
+                self.assertEqual(average.get(key), check_av.get(key))
+            else:
+                self.assertEqual(round(average.get(key), 4),
+                                 round(check_av.get(key), 4))
 
     def test_is_sfile(self):
         sfiles = ['01-0411-15L.S201309', 'automag.out', 'bad_picks.sfile',
