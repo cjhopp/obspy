@@ -205,12 +205,6 @@ class TestNordicMethods(unittest.TestCase):
                          evtype='L', outdir='albatross',
                          wavefiles='test', explosion=True,
                          overwrite=True)
-        with self.assertRaises(TypeError):
-            # Raises error due to incorrect wavefile formatting
-            eventtosfile(test_cat[0], userid='TEST',
-                         evtype='L', outdir='.',
-                         wavefiles=1234, explosion=True,
-                         overwrite=True)
         with self.assertRaises(IndexError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins = []

@@ -1,30 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-NonLinLoc file format support for ObsPy
+Nordic file format support for ObsPy
 
 :copyright:
     The ObsPy Development Team (devs@obspy.org)
 :license:
     GNU Lesser General Public License, Version 3
     (https://www.gnu.org/copyleft/lesser.html)
-We have not implemented any handling of focal mechanism solutions between
-the two formats.
 
-.. note:: Pick time-residuals are handled in event.origins[0].arrivals, with \
-    the arrival.pick_id linking the arrival (which contain calculated \
-    information) with the pick.resource_id (where the pick contains only \
+.. note::
+
+    We have not implemented any handling of focal mechanism solutions between
+    the two formats.
+
+.. note::
+
+    Pick time-residuals are handled in event.origins[0].arrivals, with
+    the arrival.pick_id linking the arrival (which contain calculated
+    information) with the pick.resource_id (where the pick contains only
     physical measured information).
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from future.builtins import *  # NOQA @UnusedWildImport
-from six import string_types
-from obspy import UTCDateTime
+
+import warnings
+
 import numpy as np
+
+from obspy import UTCDateTime
 from obspy.core.event import Event, Origin, Magnitude, Comment, Catalog
 from obspy.core.event import EventDescription, CreationInfo
 from obspy.core.event import Pick, WaveformStreamID, Arrival, Amplitude
-import warnings
 
 
 def is_sfile(sfile):
@@ -97,21 +104,22 @@ def _str_conv(number, rounded=False):
     >>> _str_conv(12.34546, rounded=1)
     '12.3'
     """
+    string = str(number)
     if (isinstance(number, float) and np.isnan(number)) or number == 999:
         string = ' '
-    elif isinstance(number, string_types):
-        return str(number)
     elif not rounded:
         if number < 100000:
             string = str(number)
-        else:
+        elif isinstance(number, float) or isinstance(number, int):
             exponant = int('{0:.2E}'.format(number).split('E+')[-1]) - 1
             divisor = 10 ** exponant
             string = '{0:.1f}'.format(number / divisor) + 'e' + str(exponant)
-    elif rounded == 2:
+    elif rounded == 2 and (isinstance(number, float) or isinstance(number, int)):
         string = '{0:.2f}'.format(number)
-    elif rounded == 1:
+    elif rounded == 1 and (isinstance(number, float) or isinstance(number, int)):
         string = '{0:.1f}'.format(number)
+    else:
+        return str(number)
     return str(string)
 
 
@@ -185,10 +193,7 @@ def readheader(sfile):
 
     :returns: :class: obspy.core.event.Event
     """
-    if isinstance(sfile, str):
-        f = open(sfile, 'r')
-    else:
-        f = sfile
+    f = open(sfile, 'r')
     header = _readheader(f=f)
     f.close()
     return header
@@ -317,10 +322,7 @@ def read_spectral_info(sfile):
     :returns: dictionary of spectral information, units as in seisan manual, \
         expect for logs which have been converted to floats.
     """
-    if isinstance(sfile, str):
-        f = open(sfile, 'r')
-    else:
-        f = sfile
+    f = open(sfile, 'r')
     spec_inf = _read_spectral_info(f=f)
     f.close()
     return spec_inf
@@ -505,16 +507,15 @@ def readpicks(sfile):
 
     :return: obspy.core.event.Event
 
-    .. warning:: Currently finalweight is unsupported, nor is velocity, \
-    or angle of incidence.  This is because obspy.event stores slowness \
-    in s/deg and takeoff angle, which would require computation from the \
-    values stored in seisan.  Multiple weights are also not supported in \
-    Obspy.event.
+    .. warning::
+
+        Currently finalweight is unsupported, nor is velocity,
+        or angle of incidence.  This is because obspy.event stores
+        slowness in s/deg and takeoff angle, which would require
+        computation from the values stored in seisan.  Multiple
+        weights are also not supported in Obspy.event.
     """
-    if isinstance(sfile, str):
-        f = open(sfile, 'r')
-    else:
-        f = sfile
+    f = open(sfile, 'r')
     new_event = _readheader(f=f)
     wav_names = _readwavename(f=f)
     event = _read_picks(f=f, wav_names=wav_names, new_event=new_event)
@@ -705,10 +706,7 @@ def readwavename(sfile):
     :returns: List of strings of wave paths
     :rtype: list
     """
-    if isinstance(sfile, str):
-        f = open(sfile, 'r')
-    else:
-        f = sfile
+    f = open(sfile, 'r')
     wavenames = _readwavename(f=f)
     f.close()
     return wavenames
@@ -859,7 +857,9 @@ def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
 
     :returns: str: name of sfile written
 
-    .. note:: Seisan can find waveforms either by their relative or absolute \
+    .. note::
+
+        Seisan can find waveforms either by their relative or absolute \
         path, or by looking for the file recursively in directories within \
         the WAV directory in your seisan install.  Because all lines need to \
         be less than 79 characters long (fortran hangover) in the s-files, \
@@ -888,12 +888,8 @@ def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
         event = event
     else:
         raise IOError('Needs a single event')
-    if isinstance(wavefiles, string_types):
+    if not isinstance(wavefiles, list):
         wavefiles = [str(wavefiles)]
-    elif isinstance(wavefiles, list):
-        wavefiles = wavefiles
-    else:
-        raise IOError(wavefiles + ' is neither string or list')
     # Determine name from origin time
     try:
         evtime = event.origins[0].time
@@ -1115,11 +1111,13 @@ def nordpick(event):
 
     :returns: List of String
 
-    .. note:: Currently finalweight is unsupported, nor is velocity, or \
-    angle of incidence.  This is because obspy.event stores slowness in \
-    s/deg and takeoff angle, which would require computation from the \
-    values stored in seisan.  Multiple weights are also not supported in \
-    Obspy.event.
+    .. note::
+
+        Currently finalweight is unsupported, nor is velocity, or
+        angle of incidence.  This is because obspy.event stores slowness
+        in s/deg and takeoff angle, which would require computation
+        from the values stored in seisan.  Multiple weights are also
+        not supported in Obspy.event.
     """
 
     pick_strings = []
@@ -1295,7 +1293,9 @@ def stationtoseisan(station):
 
     :returns: str
 
-    .. note:: Only works to the low-precision level at the moment (see seisan \
+    .. note::
+
+        Only works to the low-precision level at the moment (see seisan
         manual for explanation).
     """
 
