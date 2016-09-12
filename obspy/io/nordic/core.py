@@ -44,18 +44,42 @@ def is_sfile(sfile):
     :param sfile: Path to sfile
     :rtype: bool
     """
-    try:
-        header = readheader(sfile=sfile)
-    except TypeError:
+    if not hasattr(sfile, "readline"):
+        with open(sfile, 'r') as f:
+            topline = f.readline()
+            if not len(topline.rstrip()) == 80:
+                return False
+            f.seek(0)
+            for line in f:
+                print(line)
+                if line[79] in [' ', '1']:
+                    head_line = line
+                    break
+    else:
         # Case of parsing data directly
-        try:
-            header = _readheader(f=sfile)
-        except (IOError, AttributeError):
+        topline = sfile.readline()
+        if not len(topline.rstrip() == 80):
             return False
-    except IOError:
-        return False
-    if header:
-        return True
+        sfile.seek(0)
+        for line in sfile:
+            if line[79] in [' ', '1']:
+                head_line = line
+                break
+    if 'head_line' in locals():
+        sfile_seconds = int(head_line[16:18])
+        if sfile_seconds == 60:
+            sfile_seconds = 0
+            add_seconds = 60
+        else:
+            add_seconds = 0
+        try:
+            UTCDateTime(int(head_line[1:5]), int(head_line[6:8]),
+                        int(head_line[8:10]), int(head_line[11:13]),
+                        int(head_line[13:15]), sfile_seconds,
+                        int(head_line[19:20]) * 100000) + add_seconds
+            return True
+        except:
+            return False
     else:
         return False
 
@@ -216,6 +240,7 @@ def _readheader(f):
     new_event = Event()
     topline = f.readline()
     if not len(topline.rstrip()) == 80:
+        f.close()
         raise IOError('s-file has a corrupt header, not 80 char long')
     f.seek(0)
     for line in f:
@@ -223,6 +248,7 @@ def _readheader(f):
             topline = line
             break
         if line[79] == '7':
+            f.close()
             raise IOError('No header found, corrupt s-file?')
     try:
         sfile_seconds = int(topline[16:18])
@@ -242,6 +268,7 @@ def _readheader(f):
                                                 100000)\
             + add_seconds
     except:
+        f.close()
         IOError("Couldn't read a date from sfile")
     # new_event.loc_mod_ind=topline[20]
     new_event.event_descriptions.append(EventDescription())
@@ -483,7 +510,16 @@ def read_select(select_file):
 
     catalog = Catalog()
     event_str = []
-    f = open(select_file, 'r')
+    if not hasattr(select_file, "readline"):
+        try:
+            f = open(select_file, 'r')
+        except:
+            try:
+                f = select_file.decode()
+            except:
+                f = str(select_file)
+    else:
+        f = select_file
     for line in f:
         if len(line.rstrip()) > 0:
             event_str.append(line)
