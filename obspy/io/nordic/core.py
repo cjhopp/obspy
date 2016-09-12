@@ -595,14 +595,14 @@ def _read_picks(f, wav_names, new_event):
         azimuth = _float_conv(line[46:51])
         velocity = _float_conv(line[52:56])
         if header[57:60] == 'AIN':
-            AIN = _float_conv(line[57:60])
+            ain = _float_conv(line[57:60])
         elif header[57:60] == 'SNR':
             snr = _float_conv(line[57:60])
         azimuthres = _int_conv(line[60:63])
         timeres = _float_conv(line[63:68])
         finalweight = _int_conv(line[68:70])
         distance = _float_conv(line[70:75])
-        CAZ = _int_conv(line[76:79])
+        caz = _int_conv(line[76:79])
         # Create a new obspy.event.Pick class for this pick
         _waveform_id = WaveformStreamID(station_code=station,
                                         channel_code=channel,
@@ -651,7 +651,7 @@ def _read_picks(f, wav_names, new_event):
                 # Generic amplitude type
                 new_event.amplitudes[amplitude_index].type = 'A'
             if not snr == 999.0:
-                new_event.amplitudes[amplitude_index].snr = SNR
+                new_event.amplitudes[amplitude_index].snr = snr
             amplitude_index += 1
         elif not coda == 999:
             # Create an amplitude instance for code duration also
@@ -669,7 +669,7 @@ def _read_picks(f, wav_names, new_event):
             new_event.amplitudes[amplitude_index].unit = 's'
             new_event.amplitudes[amplitude_index].magnitude_hint = 'Mc'
             if snr and not snr == 999.0:
-                new_event.amplitudes[amplitude_index].snr = SNR
+                new_event.amplitudes[amplitude_index].snr = snr
             amplitude_index += 1
         # Create new obspy.event.Arrival class referencing above Pick
         new_event.origins[0].arrivals.append(Arrival(phase=new_event.
@@ -690,9 +690,9 @@ def _read_picks(f, wav_names, new_event):
         if distance != 999:
             new_event.origins[0].arrivals[pick_index].distance =\
                 distance
-        if CAZ != 999:
+        if caz != 999:
             new_event.origins[0].arrivals[pick_index].azimuth =\
-                CAZ
+                caz
     # Write event to catalog object for ease of .write() method
     return new_event
 
@@ -1192,11 +1192,11 @@ def nordpick(event):
                 distance = ' '
             # Extract CAZ
             if arrival.azimuth:
-                CAZ = int(arrival.azimuth)
+                caz = int(arrival.azimuth)
             else:
-                CAZ = ' '
+                caz = ' '
         else:
-            CAZ = ' '
+            caz = ' '
             distance = ' '
             timeres = ' '
             azimuthres = ' '
@@ -1278,7 +1278,7 @@ def nordpick(event):
                             _str_conv(timeres, rounded=2).rjust(5)[0:5] +
                             _str_conv(' ').rjust(2) +
                             distance.rjust(5) +
-                            _str_conv(CAZ).rjust(4) + ' ')
+                            _str_conv(caz).rjust(4) + ' ')
         # Note that currently finalweight is unsupported, nor is velocity, or
         # angle of incidence.  This is because obspy.event stores slowness in
         # s/deg and takeoff angle, which would require computation from the
