@@ -107,16 +107,19 @@ def _str_conv(number, rounded=False):
     string = str(number)
     if (isinstance(number, float) and np.isnan(number)) or number == 999:
         string = ' '
-    elif not rounded:
+    elif not rounded and \
+            (isinstance(number, float) or isinstance(number, int)):
         if number < 100000:
             string = str(number)
-        elif isinstance(number, float) or isinstance(number, int):
+        else:
             exponant = int('{0:.2E}'.format(number).split('E+')[-1]) - 1
             divisor = 10 ** exponant
             string = '{0:.1f}'.format(number / divisor) + 'e' + str(exponant)
-    elif rounded == 2 and (isinstance(number, float) or isinstance(number, int)):
+    elif rounded == 2 and \
+            (isinstance(number, float) or isinstance(number, int)):
         string = '{0:.2f}'.format(number)
-    elif rounded == 1 and (isinstance(number, float) or isinstance(number, int)):
+    elif rounded == 1 and \
+            (isinstance(number, float) or isinstance(number, int)):
         string = '{0:.1f}'.format(number)
     else:
         return str(number)
@@ -539,7 +542,7 @@ def _read_picks(f, wav_names, new_event):
     evtime = new_event.origins[0].time
     pickline = []
     # Set a default, ignored later unless overwritten
-    SNR = 999
+    snr = 999
     if 'headerend' in locals():
         del headerend
     for lineno, line in enumerate(f):
@@ -594,7 +597,7 @@ def _read_picks(f, wav_names, new_event):
         if header[57:60] == 'AIN':
             AIN = _float_conv(line[57:60])
         elif header[57:60] == 'SNR':
-            SNR = _float_conv(line[57:60])
+            snr = _float_conv(line[57:60])
         azimuthres = _int_conv(line[60:63])
         timeres = _float_conv(line[63:68])
         finalweight = _int_conv(line[68:70])
@@ -647,7 +650,7 @@ def _read_picks(f, wav_names, new_event):
             else:
                 # Generic amplitude type
                 new_event.amplitudes[amplitude_index].type = 'A'
-            if not SNR == 999.0:
+            if not snr == 999.0:
                 new_event.amplitudes[amplitude_index].snr = SNR
             amplitude_index += 1
         elif not coda == 999:
@@ -665,7 +668,7 @@ def _read_picks(f, wav_names, new_event):
             new_event.amplitudes[amplitude_index].category = 'duration'
             new_event.amplitudes[amplitude_index].unit = 's'
             new_event.amplitudes[amplitude_index].magnitude_hint = 'Mc'
-            if SNR and not SNR == 999.0:
+            if snr and not snr == 999.0:
                 new_event.amplitudes[amplitude_index].snr = SNR
             amplitude_index += 1
         # Create new obspy.event.Arrival class referencing above Pick
@@ -727,7 +730,7 @@ def _readwavename(f):
     return wavename
 
 
-def blanksfile(wavefile, evtype, userID, outdir, overwrite=False,
+def blanksfile(wavefile, evtype, userid, outdir, overwrite=False,
                evtime=False):
     """
     Generate an empty s-file with a populated header for a given waveform.
@@ -737,8 +740,8 @@ def blanksfile(wavefile, evtype, userID, outdir, overwrite=False,
         the S-file will be taken from this file if evtime is not set.
     :type evtype: str
     :param evtype: Event type letter code, e.g. L, R, D
-    :type userID: str
-    :param userID: 4-character SEISAN USER ID
+    :type userid: str
+    :param userid: 4-character SEISAN USER ID
     :type outdir: str
     :param outdir: Location to write S-file
     :type overwrite: bool
@@ -761,7 +764,7 @@ def blanksfile(wavefile, evtype, userID, outdir, overwrite=False,
             raise IOError('Wavefile: ' + wavefile +
                           ' is invalid, try again with real data.')
     # Check that user ID is the correct length
-    if len(userID) != 4:
+    if len(userid) != 4:
         raise IOError('User ID must be 4 characters long')
     # Check that outdir exists
     if not os.path.isdir(outdir):
@@ -810,7 +813,7 @@ def blanksfile(wavefile, evtype, userID, outdir, overwrite=False,
                 str(datetime.datetime.now().day).zfill(2) + ' ' +
                 str(datetime.datetime.now().hour).zfill(2) + ':' +
                 str(datetime.datetime.now().minute).zfill(2) + ' OP:' +
-                userID.ljust(4) + ' STATUS:' + 'ID:'.rjust(18) +
+                userid.ljust(4) + ' STATUS:' + 'ID:'.rjust(18) +
                 str(evtime.year) +
                 str(evtime.month).zfill(2) +
                 str(evtime.day).zfill(2) +
@@ -840,8 +843,8 @@ def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
     :type filename: str
     :param filename: Filname to write to, can be None, and filename will be \
         generated from the origin time in seisan format.
-    :type userID: str
-    :param userID: Up to 4 character user ID
+    :type userid: str
+    :param userid: Up to 4 character user ID
     :type evtype: str
     :param evtype: Single character string to describe the event, either L, R \
         or D.
