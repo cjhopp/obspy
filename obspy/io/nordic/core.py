@@ -45,16 +45,19 @@ def is_sfile(sfile):
     :rtype: bool
     """
     try:
-        readheader(sfile=sfile)
+        header = readheader(sfile=sfile)
     except TypeError:
         # Case of parsing data directly
         try:
-            _readheader(f=sfile)
+            header = _readheader(f=sfile)
         except (IOError, AttributeError):
             return False
     except IOError:
         return False
-    return True
+    if header:
+        return True
+    else:
+        return False
 
 
 def _int_conv(string):
