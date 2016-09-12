@@ -239,8 +239,7 @@ def _readheader(f):
                                                 100000)\
             + add_seconds
     except:
-        warnings.warn("Couldn't read a date from sfile")
-        new_event.origins.append(Origin(time=UTCDateTime(0)))
+        IOError("Couldn't read a date from sfile")
     # new_event.loc_mod_ind=topline[20]
     new_event.event_descriptions.append(EventDescription())
     new_event.event_descriptions[0].text = topline[21:23]
