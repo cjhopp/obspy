@@ -45,20 +45,21 @@ def is_sfile(sfile):
     :rtype: bool
     """
     if not hasattr(sfile, "readline"):
-        with open(sfile, 'r') as f:
-            topline = f.readline()
-            if not len(topline.rstrip()) == 80:
-                return False
-            f.seek(0)
-            for line in f:
-                print(line)
-                if line[79] in [' ', '1']:
-                    head_line = line
-                    break
+        try:
+            with open(sfile, 'r') as f:
+                topline = f.readline()
+                if not len(topline.rstrip()) == 80:
+                    return False
+                f.seek(0)
+                for line in f:
+                    if line[79] in [' ', '1']:
+                        head_line = line
+                        break
+        except:
+            return False
     else:
-        # Case of parsing data directly
         topline = sfile.readline()
-        if not len(topline.rstrip() == 80):
+        if not len(topline.rstrip()) == 80:
             return False
         sfile.seek(0)
         for line in sfile:
