@@ -23,6 +23,7 @@ from obspy.io.nordic.core import is_sfile, read_spectral_info, read_nordic
 from obspy.io.nordic.core import readwavename, blanksfile, write_nordic
 from obspy.io.nordic.core import nordpick, stationtoseisan, readheader
 from obspy.io.nordic.core import _int_conv, _readheader, _evmagtonor
+from obspy.io.nordic.core import write_select
 from obspy.io.nordic.core import _float_conv, _nortoevmag, _str_conv
 
 
@@ -272,6 +273,14 @@ class TestNordicMethods(unittest.TestCase):
         with self.assertRaises(IOError):
             # Unknown event type
             blanksfile(testing_path, 'U', 'TEST', '.', overwrite=True)
+        # Check that it breaks when writing multiple versions
+        sfiles = []
+        for i in range(10):
+            sfiles.append(blanksfile(testing_path, 'L', 'TEST', '.'))
+        with self.assertRaises(IOError):
+            blanksfile(testing_path, 'L', 'TEST', '.')
+        for sfile in sfiles:
+            os.remove(sfile)
         os.remove(testing_path)
 
     def test_write_empty(self):
@@ -353,6 +362,30 @@ class TestNordicMethods(unittest.TestCase):
         ref_cat = read_events(filename)
         self.assertTrue(test_similarity(cat[0], ref_cat[0]))
 
+    def test_corrupt_header(self):
+        filename = os.path.join(self.testing_path, '01-0411-15L.S201309')
+        tmp_file = os.path.join(self.testing_path, 'corrupt.sfile')
+        f = open(filename, 'r')
+        fout = open(tmp_file, 'w')
+        for line in f:
+            fout.write(line[0:78])
+        f.close()
+        fout.close()
+        with self.assertRaises(IOError):
+            readheader(tmp_file)
+        os.remove(tmp_file)
+
+    def test_multi_writing(self):
+        event = full_test_event()
+        # Try to write the same event multiple times, but not overwrite
+        sfiles = []
+        for i in range(59):
+            sfiles.append(write_nordic(event=event))
+        with self.assertRaises(IOError):
+            write_nordic(event=event)
+        for sfile in sfiles:
+            os.remove(sfile)
+
     def test_mag_conv(self):
         """Check that we convert magnitudes as we should!"""
         magnitude_map = [('L', 'ML'),
@@ -417,6 +450,14 @@ class TestNordicMethods(unittest.TestCase):
         testing_path = os.path.join(self.testing_path, 'select.out')
         catalog = read_nordic(testing_path)
         self.assertEqual(len(catalog), 50)
+
+    def test_write_select(self):
+        cat = read_events()
+        write_select(cat)
+        cat_back = read_events('select.out')
+        os.remove('select.out')
+        for event_1, event_2 in zip(cat, cat_back):
+            self.assertTrue(test_similarity(event_1=event_1, event_2=event_2))
 
     def test_inaccurate_picks(self):
         testing_path = os.path.join(self.testing_path, 'bad_picks.sfile')
@@ -489,9 +530,12 @@ def test_similarity(event_1, event_2):
         return False
     for ori_1, ori_2 in zip(event_1.origins, event_2.origins):
         for key in ori_1.keys():
-            if key not in ["resource_id", "comments", "arrivals"]:
+            if key not in ["resource_id", "comments", "arrivals",
+                           "method_id", "origin_uncertainty", "depth_type",
+                           "quality", "creation_info", "evaluation_mode",
+                           "depth_errors", "time_errors"]:
                 if not ori_1[key] == ori_2[key]:
-                    print('Different %s' % key)
+                    print('Different origin: %s' % key)
                     print(ori_1[key])
                     print(ori_2[key])
                     return False
@@ -502,7 +546,7 @@ def test_similarity(event_1, event_2):
                     for arr_key in arr_1.keys():
                         if arr_key not in ["resource_id", "pick_id"]:
                             if not arr_1[arr_key] == arr_2[arr_key]:
-                                print('Different %s' % arr_key)
+                                print('Different arrival: %s' % arr_key)
                                 print(arr_1[arr_key])
                                 print(arr_2[arr_key])
                                 return False
@@ -514,7 +558,7 @@ def test_similarity(event_1, event_2):
         for key in pick_1.keys():
             if not key == "resource_id":
                 if not pick_1[key] == pick_2[key]:
-                    print('Different %s' % key)
+                    print('Different pick: %s' % key)
                     print(pick_1[key])
                     print(pick_2[key])
                     return False
@@ -526,7 +570,7 @@ def test_similarity(event_1, event_2):
         for key in amp_1.keys():
             if key not in ["resource_id", "pick_id"]:
                 if not amp_1[key] == amp_2[key]:
-                    print('Different %s' % key)
+                    print('Different arrival: %s' % key)
                     print(amp_1[key])
                     print(amp_2[key])
                     return False
@@ -539,7 +583,7 @@ def full_test_event():
     """
     test_event = Event()
     test_event.origins.append(Origin())
-    test_event.origins[0].time = UTCDateTime("2012-03-26") + 1
+    test_event.origins[0].time = UTCDateTime("2012-03-26") + 1.2
     test_event.event_descriptions.append(EventDescription())
     test_event.event_descriptions[0].text = 'LE'
     test_event.origins[0].latitude = 45.0

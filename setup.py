@@ -318,6 +318,11 @@ ENTRY_POINTS = {
     'obspy.plugin.event.NLLOC_OBS': [
         'writeFormat = obspy.io.nlloc.core:write_nlloc_obs',
         ],
+    'obspy.plugin.event.NORDIC': [
+        'writeFormat = obspy.io.nordic.core:write_select',
+        'readFormat = obspy.io.nordic.core:read_nordic',
+        'isFormat = obspy.io.nordic.core:is_sfile'
+        ],
     'obspy.plugin.event.CMTSOLUTION': [
         'isFormat = obspy.io.cmtsolution.core:_is_cmtsolution',
         'readFormat = obspy.io.cmtsolution.core:_read_cmtsolution',
@@ -333,11 +338,6 @@ ENTRY_POINTS = {
     'obspy.plugin.event.KML': [
         'writeFormat = obspy.io.kml.core:_write_kml',
         ],
-    'obspy.plugin.event.NORDIC': [
-        'writeFormat = obspy.io.nordic.core:write_nordic',
-        'readFormat = obspy.io.nordic.core:read_nordic',
-        'isFormat = obspy.io.nordic.core:is_sfile'
-    ],
     'obspy.plugin.inventory': [
         'STATIONXML = obspy.io.stationxml.core',
         'SC3ML = obspy.io.seiscomp.sc3ml',

@@ -27,6 +27,7 @@ from future.builtins import *  # NOQA @UnusedWildImport
 import warnings
 
 import numpy as np
+import os
 
 from obspy import UTCDateTime
 from obspy.core.event import Event, Origin, Magnitude, Comment, Catalog
@@ -168,6 +169,7 @@ def _evmagtonor(mag_type):
     >>> _evmagtonor('bob')
     ''
     """
+    mag_type = str(mag_type)
     if mag_type in ['ML', 'MLv']:
         # MLv is local magnitude on vertical component
         mag = 'L'
@@ -202,6 +204,7 @@ def _nortoevmag(mag_type):
     >>> _nortoevmag('bob')
     ''
     """
+    mag_type = str(mag_type)
     if mag_type == 'L':
         mag = 'ML'
     elif mag_type == 'b':
@@ -837,6 +840,36 @@ def blanksfile(wavefile, evtype, userid, outdir, overwrite=False,
     return sfile
 
 
+def write_select(catalog, filename='select.out', userid='OBSP', evtype='L',
+                 wavefiles=None):
+    """Function to write a catalog to a select file in nordic format.
+
+    :type catalog: obspy.core.event.Catalog
+    :param catalog: A catalog of obspy events
+    :type filename: str
+    :param filename: Path to write to
+    :type userid: str
+    :param userid: Up to 4 character user ID
+    :type evtype: str
+    :param evtype: Single character string to describe the event, either L, R \
+        or D.
+    :type wavefiles: list
+    :param wavefiles: Waveforms to associate the events with, must be ordered \
+        in the same way as the events in the catalog.
+    """
+    if not wavefiles:
+        wavefiles = ['DUMMY' for i in range(len(catalog))]
+    with open(filename, 'w') as fout:
+        for event, wavfile in zip(catalog, wavefiles):
+            sfile = write_nordic(event=event, userid=userid, evtype=evtype,
+                                 wavefiles=wavfile)
+            with open(sfile, 'r') as f:
+                for line in f:
+                    fout.write(line)
+            fout.write('\n')
+            os.remove(sfile)
+
+
 def write_nordic(event, filename=None, userid='OBSP', evtype='L', outdir='.',
                  wavefiles='DUMMY', explosion=False,
                  overwrite=False):
@@ -1018,7 +1051,8 @@ def write_nordic(event, filename=None, userid='OBSP', evtype='L', outdir='.',
                 str(evtime.day).rjust(2) + ' ' +
                 str(evtime.hour).rjust(2) +
                 str(evtime.minute).rjust(2) + ' ' +
-                str(float(evtime.second)).rjust(4) + ' ' +
+                str(evtime.second).rjust(2) + '.' +
+                str(evtime.microsecond).ljust(1)[0:1] + ' ' +
                 evtype.ljust(2) + lat.rjust(7) + ' ' + lon.rjust(7) +
                 depth.rjust(5) + agency.rjust(5) + ksta.rjust(3) +
                 timerms.rjust(4) +
