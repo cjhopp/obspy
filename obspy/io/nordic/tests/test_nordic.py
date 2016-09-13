@@ -501,7 +501,7 @@ def test_similarity(event_1, event_2):
                 for arr_1, arr_2 in zip(ori_1[key], ori_2[key]):
                     for arr_key in arr_1.keys():
                         if arr_key not in ["resource_id", "pick_id"]:
-                           if not arr_1[arr_key] == arr_2[arr_key]:
+                            if not arr_1[arr_key] == arr_2[arr_key]:
                                 print('Different %s' % arr_key)
                                 print(arr_1[arr_key])
                                 print(arr_2[arr_key])

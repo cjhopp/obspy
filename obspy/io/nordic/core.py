@@ -188,8 +188,8 @@ def _evmagtonor(mag_type):
         msg = ('Converting generic magnitude to being stored as moment mag')
         warnings.warn(msg)
     else:
-        warnings.warn(mag_type + ' is not convertable')
-        return ''
+        warnings.warn(mag_type + ' is not convertible')
+        return str('')
     return str(mag)
 
 
@@ -217,8 +217,8 @@ def _nortoevmag(mag_type):
     elif mag_type == 'C':
         mag = 'Mc'
     else:
-        warnings.warn(mag_type + ' is not convertable')
-        return ''
+        warnings.warn(mag_type + ' is not convertible')
+        return str('')
     return str(mag)
 
 
