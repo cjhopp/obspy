@@ -334,8 +334,8 @@ ENTRY_POINTS = {
         'writeFormat = obspy.io.kml.core:_write_kml',
         ],
     'obspy.plugin.event.NORDIC': [
-        'writeFormat = obspy.io.nordic.core:eventtosfile',
-        'readFormat = obspy.io.nordic.core:read_select',
+        'writeFormat = obspy.io.nordic.core:write_nordic',
+        'readFormat = obspy.io.nordic.core:read_nordic',
         'isFormat = obspy.io.nordic.core:is_sfile'
     ],
     'obspy.plugin.inventory': [

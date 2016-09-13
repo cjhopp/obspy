@@ -1,22 +1,40 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-Functions for testing the utils.sfile_util functions
+Functions for testing the obspy.io.nordic functions
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from future.builtins import *  # NOQA @UnusedWildImport
-from obspy.io.nordic.core import is_sfile, read_spectral_info, read_event, \
-    read_select, readpicks, readwavename, blanksfile, eventtosfile, \
-    nordpick, stationtoseisan
-from obspy.io.nordic.core import _int_conv, _evmagtonor, _float_conv, \
-    _nortoevmag, _str_conv
+
 import numpy as np
-import unittest
+
+import inspect
+import io
 import os
+import unittest
+
 from obspy import read_events, Catalog, UTCDateTime, read
+from obspy.core.event import Pick, WaveformStreamID, Arrival, Amplitude
+from obspy.core.event import Event, Origin, Magnitude
+from obspy.core.event import EventDescription, CreationInfo
 from obspy.clients.fdsn import Client
+from obspy.io.nordic.core import is_sfile, read_spectral_info, read_nordic
+from obspy.io.nordic.core import readwavename, blanksfile, write_nordic
+from obspy.io.nordic.core import nordpick, stationtoseisan, readheader
+from obspy.io.nordic.core import _int_conv, _readheader, _evmagtonor
+from obspy.io.nordic.core import _float_conv, _nortoevmag, _str_conv
 
 
 class TestNordicMethods(unittest.TestCase):
+    """
+    Test suite for nordic io operations.
+    """
+    def setUp(self):
+        self.path = os.path.dirname(os.path.abspath(inspect.getfile(
+            inspect.currentframe())))
+        self.testing_path = os.path.join(self.path, "data")
+
     def test_read_write(self):
         """
         Function to test the read and write capabilities of sfile_util.
@@ -88,13 +106,13 @@ class TestNordicMethods(unittest.TestCase):
                          test_cat[0].amplitudes[1].category)
 
         # Check the read-write s-file functionality
-        sfile = eventtosfile(test_cat[0], userid='TEST',
+        sfile = write_nordic(test_cat[0], userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True, overwrite=True)
         del read_cat
         self.assertEqual(readwavename(sfile), ['test'])
         read_cat = Catalog()
-        read_cat += readpicks(sfile)
+        read_cat += read_nordic(sfile)
         os.remove(sfile)
         for i in range(len(read_cat[0].picks)):
             self.assertEqual(read_cat[0].picks[i].time,
@@ -183,39 +201,39 @@ class TestNordicMethods(unittest.TestCase):
         test_cat.append(full_test_event())
         with self.assertRaises(IOError):
             # Raises error due to multiple events in catalog
-            eventtosfile(test_cat, userid='TEST',
+            write_nordic(test_cat, userid='TEST',
                          evtype='L', outdir='.',
                          wavefiles='test', explosion=True,
                          overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to too long userid
-            eventtosfile(test_cat[0], userid='TESTICLE',
+            write_nordic(test_cat[0], userid='TESTICLE',
                          evtype='L', outdir='.',
                          wavefiles='test', explosion=True,
                          overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to unrecognised event type
-            eventtosfile(test_cat[0], userid='TEST',
+            write_nordic(test_cat[0], userid='TEST',
                          evtype='U', outdir='.',
                          wavefiles='test', explosion=True,
                          overwrite=True)
         with self.assertRaises(IOError):
             # Raises error due to no output directory
-            eventtosfile(test_cat[0], userid='TEST',
+            write_nordic(test_cat[0], userid='TEST',
                          evtype='L', outdir='albatross',
                          wavefiles='test', explosion=True,
                          overwrite=True)
         with self.assertRaises(IndexError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins = []
-            eventtosfile(invalid_origin, userid='TEST',
+            write_nordic(invalid_origin, userid='TEST',
                          evtype='L', outdir='.',
                          wavefiles='test', explosion=True,
                          overwrite=True)
         with self.assertRaises(ValueError):
             invalid_origin = test_cat[0].copy()
             invalid_origin.origins[0].time = None
-            eventtosfile(invalid_origin, userid='TEST',
+            write_nordic(invalid_origin, userid='TEST',
                          evtype='L', outdir='.',
                          wavefiles='test', explosion=True,
                          overwrite=True)
@@ -224,7 +242,7 @@ class TestNordicMethods(unittest.TestCase):
         valid_origin.origins[0].latitude = None
         valid_origin.origins[0].longitude = None
         valid_origin.origins[0].depth = None
-        sfile = eventtosfile(valid_origin, userid='TEST',
+        sfile = write_nordic(valid_origin, userid='TEST',
                              evtype='L', outdir='.',
                              wavefiles='test', explosion=True,
                              overwrite=True)
@@ -260,19 +278,16 @@ class TestNordicMethods(unittest.TestCase):
         """
         Function to check that writing a blank event works as it should.
         """
-        from obspy.core.event import Event, Origin
-        from obspy import UTCDateTime
-        import os
         test_event = Event()
         with self.assertRaises(IndexError):
-            eventtosfile(test_event, userid='TEST', evtype='L',
+            write_nordic(test_event, userid='TEST', evtype='L',
                          outdir='.', wavefiles='test')
         test_event.origins.append(Origin())
         with self.assertRaises(ValueError):
-            eventtosfile(test_event, userid='TEST', evtype='L',
+            write_nordic(test_event, userid='TEST', evtype='L',
                          outdir='.', wavefiles='test')
         test_event.origins[0].time = UTCDateTime()
-        test_sfile = eventtosfile(test_event, userid='TEST', evtype='L',
+        test_sfile = write_nordic(test_event, userid='TEST', evtype='L',
                                   outdir='.', wavefiles='test')
         self.assertTrue(os.path.isfile(test_sfile))
         os.remove(test_sfile)
@@ -282,21 +297,18 @@ class TestNordicMethods(unittest.TestCase):
         Function to check a known issue, empty header info S-file: Bug found \
         by Dominic Evanzia.
         """
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data')
-        test_event = readpicks(os.path.join(testing_path, 'Sfile_no_header'))
+        test_event = read_nordic(os.path.join(self.testing_path,
+                                              'Sfile_no_location'))[0]
         self.assertTrue(np.isnan(test_event.origins[0].latitude))
         self.assertTrue(np.isnan(test_event.origins[0].longitude))
         self.assertTrue(np.isnan(test_event.origins[0].depth))
 
     def test_read_extra_header(self):
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'Sfile_extra_header')
-        not_extra_header = os.path.join(os.path.abspath(os.path.
-                                                        dirname(__file__)),
-                                        'data', '01-0411-15L.S201309')
-        test_event = readpicks(testing_path)
-        header_event = readpicks(not_extra_header)
+        testing_path = os.path.join(self.testing_path, 'Sfile_extra_header')
+        not_extra_header = os.path.join(self.testing_path,
+                                        '01-0411-15L.S201309')
+        test_event = read_nordic(testing_path)[0]
+        header_event = read_nordic(not_extra_header)[0]
         self.assertEqual(test_event.origins[0].time,
                          header_event.origins[0].time)
         self.assertEqual(test_event.origins[0].latitude,
@@ -305,6 +317,41 @@ class TestNordicMethods(unittest.TestCase):
                          header_event.origins[0].longitude)
         self.assertEqual(test_event.origins[0].depth,
                          header_event.origins[0].depth)
+
+    def test_header_mapping(self):
+        head_1 = readheader(os.path.join(self.testing_path,
+                                         '01-0411-15L.S201309'))
+        with open(os.path.join(self.testing_path,
+                               '01-0411-15L.S201309'), 'r') as f:
+            head_2 = _readheader(f=f)
+        self.assertTrue(test_similarity(head_1, head_2))
+
+    def test_missing_header(self):
+        # Check that a suitable error is raised
+        with self.assertRaises(IOError):
+            readheader(os.path.join(self.testing_path, 'Sfile_no_header'))
+
+    def test_reading_string_io(self):
+        filename = os.path.join(self.testing_path, '01-0411-15L.S201309')
+        with open(filename, "rt") as fh:
+            file_object = io.StringIO(fh.read())
+
+        cat = read_events(file_object)
+        file_object.close()
+
+        ref_cat = read_events(filename)
+        self.assertTrue(test_similarity(cat[0], ref_cat[0]))
+
+    def test_reading_bytes_io(self):
+        filename = os.path.join(self.testing_path, '01-0411-15L.S201309')
+        with open(filename, "rb") as fh:
+            file_object = io.BytesIO(fh.read())
+
+        cat = read_events(file_object)
+        file_object.close()
+
+        ref_cat = read_events(filename)
+        self.assertTrue(test_similarity(cat[0], ref_cat[0]))
 
     def test_mag_conv(self):
         """Check that we convert magnitudes as we should!"""
@@ -333,8 +380,7 @@ class TestNordicMethods(unittest.TestCase):
         self.assertEqual(_str_conv(1.0256), '1.0256')
 
     def test_read_wavename(self):
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', '01-0411-15L.S201309')
+        testing_path = os.path.join(self.testing_path, '01-0411-15L.S201309')
         wavefiles = readwavename(testing_path)
         self.assertEqual(len(wavefiles), 1)
 
@@ -363,46 +409,40 @@ class TestNordicMethods(unittest.TestCase):
 
     def test_read_event(self):
         """Test the wrapper."""
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', '01-0411-15L.S201309')
-        event = read_event(testing_path)
+        testing_path = os.path.join(self.testing_path, '01-0411-15L.S201309')
+        event = read_nordic(testing_path)[0]
         self.assertEqual(len(event.origins), 1)
 
     def test_read_many_events(self):
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'select.out')
-        catalog = read_select(testing_path)
+        testing_path = os.path.join(self.testing_path, 'select.out')
+        catalog = read_nordic(testing_path)
         self.assertEqual(len(catalog), 50)
 
     def test_inaccurate_picks(self):
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'bad_picks.sfile')
-        event = readpicks(testing_path)
-        pick_string = nordpick(event)
+        testing_path = os.path.join(self.testing_path, 'bad_picks.sfile')
+        cat = read_nordic(testing_path)
+        pick_string = nordpick(cat[0])
         for pick in pick_string:
             self.assertEqual(len(pick), 80)
 
     def test_round_len(self):
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'round_len_undef.sfile')
-        event = readpicks(testing_path)
+        testing_path = os.path.join(self.testing_path, 'round_len_undef.sfile')
+        event = read_nordic(testing_path)[0]
         pick_string = nordpick(event)
         for pick in pick_string:
             self.assertEqual(len(pick), 80)
 
     def test_read_moment(self):
         """Test the reading of seismic moment from the s-file."""
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'automag.out')
-        event = read_event(testing_path)
+        testing_path = os.path.join(self.testing_path, 'automag.out')
+        event = read_nordic(testing_path)[0]
         mag = [m for m in event.magnitudes if m.magnitude_type == 'MW']
         self.assertEqual(len(mag), 1)
         self.assertEqual(mag[0].mag, 0.7)
 
     def test_read_moment_info(self):
         """Test reading the info from spectral analysis."""
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data', 'automag.out')
+        testing_path = os.path.join(self.testing_path, 'automag.out')
         spec_inf = read_spectral_info(testing_path)
         self.assertEqual(len(spec_inf), 5)
         # This should actually test that what we are reading in is correct.
@@ -423,26 +463,80 @@ class TestNordicMethods(unittest.TestCase):
     def test_is_sfile(self):
         sfiles = ['01-0411-15L.S201309', 'automag.out', 'bad_picks.sfile',
                   'round_len_undef.sfile', 'Sfile_extra_header',
-                  'Sfile_no_header']
-        testing_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                    'data')
+                  'Sfile_no_location']
         for sfile in sfiles:
-            self.assertTrue(is_sfile(os.path.join(testing_path, sfile)))
-        self.assertFalse(is_sfile(os.path.join(os.path.
-                                               abspath(os.path.
-                                                       dirname(__file__)),
-                                               '..', '..', 'nlloc', 'tests',
-                                               'data', 'nlloc.hyp')))
+            self.assertTrue(is_sfile(os.path.join(self.testing_path, sfile)))
+        self.assertFalse(is_sfile(os.path.join(self.testing_path,
+                                               'Sfile_no_header')))
+        self.assertFalse(is_sfile(os.path.join(self.path, '..', '..',
+                                               'nlloc', 'tests', 'data',
+                                               'nlloc.hyp')))
+
+
+def test_similarity(event_1, event_2):
+    """
+    Check the similarity of the components of obspy events, discounting
+    resource IDs, which are not maintained in nordic files.
+
+    :type event_1: obspy.core.event.Event
+    :param event_1: First event
+    :type event_2: obspy.core.event.Event
+    :param event_2: Comparison event
+    :return: bool
+    """
+    # Check origins
+    if not len(event_1.origins) == len(event_2.origins):
+        return False
+    for ori_1, ori_2 in zip(event_1.origins, event_2.origins):
+        for key in ori_1.keys():
+            if key not in ["resource_id", "comments", "arrivals"]:
+                if not ori_1[key] == ori_2[key]:
+                    print('Different %s' % key)
+                    print(ori_1[key])
+                    print(ori_2[key])
+                    return False
+            elif key == "arrivals":
+                if not len(ori_1[key]) == len(ori_2[key]):
+                    return False
+                for arr_1, arr_2 in zip(ori_1[key], ori_2[key]):
+                    for arr_key in arr_1.keys():
+                        if arr_key not in ["resource_id", "pick_id"]:
+                           if not arr_1[arr_key] == arr_2[arr_key]:
+                                print('Different %s' % arr_key)
+                                print(arr_1[arr_key])
+                                print(arr_2[arr_key])
+                                return False
+    # Check picks
+    if not len(event_1.picks) == len(event_2.picks):
+        return False
+    for pick_1, pick_2 in zip(event_1.picks, event_2.picks):
+        # Assuming same ordering of picks...
+        for key in pick_1.keys():
+            if not key == "resource_id":
+                if not pick_1[key] == pick_2[key]:
+                    print('Different %s' % key)
+                    print(pick_1[key])
+                    print(pick_2[key])
+                    return False
+    # Check amplitudes
+    if not len(event_1.amplitudes) == len(event_2.amplitudes):
+        return False
+    for amp_1, amp_2 in zip(event_1.amplitudes, event_2.amplitudes):
+        # Assuming same ordering of amplitudes
+        for key in amp_1.keys():
+            if key not in ["resource_id", "pick_id"]:
+                if not amp_1[key] == amp_2[key]:
+                    print('Different %s' % key)
+                    print(amp_1[key])
+                    print(amp_2[key])
+                    return False
+    return True
 
 
 def full_test_event():
     """
     Function to generate a basic, full test event
     """
-    from obspy.core.event import Pick, WaveformStreamID, Arrival, Amplitude
-    from obspy.core.event import Event, Origin, Magnitude
-    from obspy.core.event import EventDescription, CreationInfo
-
     test_event = Event()
     test_event.origins.append(Origin())
     test_event.origins[0].time = UTCDateTime("2012-03-26") + 1

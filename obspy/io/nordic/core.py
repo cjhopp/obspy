@@ -67,7 +67,10 @@ def is_sfile(sfile):
                 head_line = line
                 break
     if 'head_line' in locals():
-        sfile_seconds = int(head_line[16:18])
+        try:
+            sfile_seconds = int(head_line[16:18])
+        except ValueError:
+            return False
         if sfile_seconds == 60:
             sfile_seconds = 0
             add_seconds = 60
@@ -160,6 +163,10 @@ def _evmagtonor(mag_type):
 
     >>> _evmagtonor('mB')
     'b'
+    >>> _evmagtonor('M')
+    'W'
+    >>> _evmagtonor('bob')
+    ''
     """
     if mag_type in ['ML', 'MLv']:
         # MLv is local magnitude on vertical component
@@ -192,6 +199,8 @@ def _nortoevmag(mag_type):
 
     >>> _nortoevmag('b')
     'mB'
+    >>> _nortoevmag('bob')
+    ''
     """
     if mag_type == 'L':
         mag = 'ML'
@@ -224,9 +233,8 @@ def readheader(sfile):
 
     :returns: :class: obspy.core.event.Event
     """
-    f = open(sfile, 'r')
-    header = _readheader(f=f)
-    f.close()
+    with open(sfile, 'r') as f:
+        header = _readheader(f=f)
     return header
 
 
@@ -355,9 +363,8 @@ def read_spectral_info(sfile):
     :returns: dictionary of spectral information, units as in seisan manual, \
         expect for logs which have been converted to floats.
     """
-    f = open(sfile, 'r')
-    spec_inf = _read_spectral_info(f=f)
-    f.close()
+    with open(sfile, 'r') as f:
+        spec_inf = _read_spectral_info(f=f)
     return spec_inf
 
 
@@ -480,22 +487,7 @@ def _read_spectral_info(f):
     return spec_inf
 
 
-def read_event(sfile):
-    """
-    Read all information from a Nordic formatted s-file.
-    Maps to readpicks and readheader to read origin and pick information,
-    outputs an obspy.core.event.Event.
-
-    :type sfile: str
-    :param sfile: Nordic formatted file to open and read from.
-
-    :returns: event
-    :rtype: obspy.core.event.Event.
-    """
-    return readpicks(sfile)
-
-
-def read_select(select_file):
+def read_nordic(select_file):
     """
     Read a catalog of events from a Nordic formatted select file.
     Generates a series of temporary files for each event in the select file.
@@ -530,39 +522,15 @@ def read_select(select_file):
             for event_line in event_str:
                 tmp_sfile.write(event_line)
             tmp_sfile.close()
-            catalog += readpicks(tmp_sfile.name)
+            with open(tmp_sfile.name) as fh:
+                new_event = _readheader(f=fh)
+                wav_names = _readwavename(f=fh)
+                catalog += _read_picks(f=fh, wav_names=wav_names,
+                                       new_event=new_event)
             os.remove(tmp_sfile.name)
             event_str = []
     f.close()
     return catalog
-
-
-def readpicks(sfile):
-    """
-    Read all pick information from the s-file to an obspy.event.Catalog type.
-
-    .. note:: This was changed for version 0.1.0 from using the inbuilt \
-    PICK class.
-
-    :type sfile: str
-    :param sfile: Path to sfile
-
-    :return: obspy.core.event.Event
-
-    .. warning::
-
-        Currently finalweight is unsupported, nor is velocity,
-        or angle of incidence.  This is because obspy.event stores
-        slowness in s/deg and takeoff angle, which would require
-        computation from the values stored in seisan.  Multiple
-        weights are also not supported in Obspy.event.
-    """
-    f = open(sfile, 'r')
-    new_event = _readheader(f=f)
-    wav_names = _readwavename(f=f)
-    event = _read_picks(f=f, wav_names=wav_names, new_event=new_event)
-    f.close()
-    return event
 
 
 def _read_picks(f, wav_names, new_event):
@@ -582,8 +550,6 @@ def _read_picks(f, wav_names, new_event):
     pickline = []
     # Set a default, ignored later unless overwritten
     snr = 999
-    if 'headerend' in locals():
-        del headerend
     for lineno, line in enumerate(f):
         if 'headerend' in locals():
             if len(line.rstrip('\n').rstrip('\r')) in [80, 79] and \
@@ -871,7 +837,7 @@ def blanksfile(wavefile, evtype, userid, outdir, overwrite=False,
     return sfile
 
 
-def eventtosfile(event, filename=None, userid='OBSP', evtype='L', outdir='.',
+def write_nordic(event, filename=None, userid='OBSP', evtype='L', outdir='.',
                  wavefiles='DUMMY', explosion=False,
                  overwrite=False):
     """
@@ -1340,7 +1306,6 @@ def stationtoseisan(station):
         Only works to the low-precision level at the moment (see seisan
         manual for explanation).
     """
-
     if station.latitude < 0:
         lat_str = 'S'
     else:
